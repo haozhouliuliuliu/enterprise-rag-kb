@@ -9,7 +9,7 @@
 - 有用的产出：
   - 列出 54 个能力位，其中与本项目相关的是“文档解析与 RAG 切片”“Agent 记忆与检索”“模型接入与聚合”；
   - `inspect` 对 RAGFlow 与 Dify 做了仓库质量体检，可作为选型的辅助证据。
-- 局限：全量 `fetch/enrich` 因网络 `IncompleteRead` 只完成了 9/54 个能力位（见 `known-issues.md` KI-006），因此没有把它的排序结果作为选型依据。
+- 局限：全量 `fetch/enrich` 因网络 `IncompleteRead` 只完成了 10/54 个能力位（见 `known-issues.md` KI-006），因此没有把它的排序结果作为选型依据。
 - 代码规范方面采用仓库内置的轻量规范（`.editorconfig`、`.gitattributes`、Conventional Commits、`scripts/check-env.ps1`），没有额外引入 linter；本项目第一步只有文档和 PowerShell 脚本，引入完整 lint 工具链收益有限。
 
 ## 2. 安装位置与方式
@@ -92,7 +92,7 @@ skill-atlas update
 结果：
 
 - `fetch` 成功抓取 day/week 榜单，month 榜单因网络中断失败；
-- `enrich` 断点续跑，截至本文记录完成 9/54 个能力位（`data/raw/enriched.json`）；
+- `enrich` 断点续跑，截至本文记录完成 10/54 个能力位（`data/raw/enriched.json`）；
 - 失败原因：GitHub 搜索大响应读取不完整，抛出 `http.client.IncompleteRead`。
 
 本地规避：在 `_tools` 副本的 `src/skill_atlas/api.py` 中，把 `http.client.HTTPException` 加入重试异常（不修改上游仓库）。该问题记录为 KI-006。
