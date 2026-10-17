@@ -93,9 +93,39 @@ flowchart LR
 
 ## 4. 环境检查（Windows / Docker）
 
-> 本节在“环境检查与准备”子任务完成后补充实测数据。
+检查时间：2026-10-17 22:37（Asia/Shanghai）。检查脚本：[scripts/check-env.ps1](scripts/check-env.ps1)（只读检查，不拉镜像、不启动容器）。
 
-结论：待检查。
+| 检查项 | 实测值 | RAGFlow v0.27.2 要求 | 结论 |
+| --- | --- | --- | --- |
+| 操作系统 | Windows 11 家庭中文版，Build 26200，64 位 | Windows 10/11 x64 | ✅ |
+| CPU | AMD Ryzen 5 5500U，6 核 12 线程 | ≥ 4 核 | ✅ |
+| 物理内存 | 15.34 GB | ≥ 16 GB | ⚠️ 略低于建议值 |
+| C 盘可用空间 | 16.46 GB（D 盘可用 216.8 GB） | ≥ 50 GB | ❌ 不足 |
+| Docker CLI | 29.7.2 | ≥ 24.0.0 | ✅ |
+| Docker Compose | v5.5.0 | ≥ v2.26.1 | ✅ |
+| Docker 引擎 | 运行中，29.7.2 | 已安装且运行 | ✅ |
+| Docker Desktop | 4.89.0.238018 | 4.x | ✅ |
+| Docker VM 资源 | 12 CPU / 7.43 GB 内存 / overlayfs | 演示建议 ≥ 12 GB | ⚠️ 内存偏低 |
+| `vm.max_map_count` | 262144 | ≥ 262144 | ✅ |
+| 8080 端口 | 空闲 | 供 Web UI 使用 | ✅ |
+
+**Docker 就绪结论：是。** Docker Desktop 4.89.0 已安装，引擎启动后 Docker 29.7.2、Compose v5.5.0 均满足 RAGFlow 的版本要求，`docker info` 与 `vm.max_map_count` 检查通过。
+
+补充事实：
+
+- 检查开始时 Docker Desktop 引擎**未运行**（`npipe:////./pipe/dockerDesktopLinuxEngine` 不存在）；启动 Docker Desktop 后约 15 秒引擎就绪。后续每次演示前需先启动 Docker Desktop。
+- 官方镜像为 x86_64；本机为 AMD64，架构匹配。
+- RAGFlow 官方要求 Python ≥ 3.13 仅适用于源码方式构建；本项目使用官方预构建镜像，不依赖本机 Python。
+
+**资源缺口（进入第二步前必须处理）：**
+
+| 缺口 | 实测 | 要求 | 处理方案 |
+| --- | --- | --- | --- |
+| C 盘空间 | 16.46 GB | 50 GB | 将 Docker Desktop 磁盘镜像迁到 D 盘（可用 216.8 GB），并清理 C 盘；见 KI-001 |
+| Docker VM 内存 | 7.43 GB | 建议 12 GB+ | 在 `%UserProfile%\.wslconfig` 设置 `memory=12GB`，重启 Docker Desktop；见 KI-002 |
+| 物理内存 | 15.34 GB | 16 GB | 关闭其他占用内存的应用，按 12 GB 上限运行；演示可接受但无余量 |
+
+结论：**Docker 已就绪，但资源未达标。** 第一步不启动部署；第二步开始前先按 [known-issues.md](known-issues.md) 处理 KI-001、KI-002。
 
 ## 5. 仓库结构
 
