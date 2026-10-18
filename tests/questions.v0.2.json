@@ -1,0 +1,20 @@
+{
+  "version": "0.2",
+  "description": "AnythingLLM 评测通道骨架。先用一道连通性占位题验证 API；正式 14 题在资料入库后补齐。",
+  "workspace_hint": "enterprise-rag-kb",
+  "questions": [
+    {
+      "id": "SMOKE-01",
+      "question": "这是评测通道连通性测试。请只回复：EVAL_OK",
+      "type": "占位/连通性",
+      "mode": "chat",
+      "expected": "回答包含字符串 EVAL_OK，且 API 返回 textResponse 非空",
+      "judge": {
+        "must_include_any": [
+          "EVAL_OK"
+        ],
+        "expected_sources": []
+      }
+    }
+  ]
+}
