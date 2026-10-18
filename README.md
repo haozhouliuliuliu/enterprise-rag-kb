@@ -95,9 +95,57 @@ flowchart LR
 
 ## 4. 环境检查（Windows / Docker）
 
-检查时间：2026-10-17 22:37（Asia/Shanghai）。检查脚本：[scripts/check-env.ps1](scripts/check-env.ps1)（只读检查，不拉镜像、不启动容器）。
+### 4.1 新机实测（2026-10-18，交接复核）
 
-| 检查项 | 实测值 | RAGFlow v0.27.2 要求 | 结论 |
+检查时间：2026-10-18 16:40（Asia/Shanghai）。下列数值均为新机实测，旧机数据保留在 4.2 节作历史对照。检查脚本：[scripts/check-env.ps1](scripts/check-env.ps1)（只读，不拉镜像、不启动容器）。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-env.ps1 -Drive C
+```
+
+| 检查项 | 新机实测 | RAGFlow v0.27.2 要求 | 结论 |
+| --- | --- | --- | --- |
+| 操作系统 | Windows 10 Pro 22H2，Build 19045.5854，64 位 | Windows 10/11 x64 | ⚠️ 满足文档要求，但已过常规支持期（KI-011） |
+| CPU | Intel Core i7-3770，4 核 8 线程，3.40 GHz | ≥ 4 核 | ✅ 核数达标，低于旧机 6 核 12 线程 |
+| 物理内存 | 15.96 GB | ≥ 16 GB | ⚠️ 差 0.04 GB（KI-004） |
+| C 盘可用空间 | 79.31 GB / 150 GB | ≥ 50 GB | ✅ **KI-001 已解决** |
+| D 盘可用空间 | 320.75 GB / 326.93 GB | 备用数据盘 | ✅ |
+| WSL | 未安装；WSL、VirtualMachinePlatform、Hyper-V 功能均 Disabled；`wsl.exe` 10.0.19041.5794（inbox），无发行版 | Docker Desktop WSL2 后端要求 WSL ≥ 2.1.5 | ❌ 缺失 |
+| Docker Desktop | 未安装（无安装目录、无服务、无进程） | 4.x | ❌ 缺失 |
+| Docker CLI | not found | ≥ 24.0.0 | ❌ 缺失 |
+| Docker Compose | not found | ≥ v2.26.1 | ❌ 缺失 |
+| Docker 引擎 | not reachable | 已安装且运行 | ❌ 缺失 |
+| Docker VM 资源 | 不可测（Docker 未安装） | 演示建议 ≥ 12 GB | ❓ 未验证 |
+| `vm.max_map_count` | 不可测（无 `docker-desktop` 发行版） | ≥ 262144 | ❓ 未验证 |
+| 8080 端口 | 空闲 | 供 Web UI 使用 | ✅ |
+
+**环境结论：不满足第二步启动条件。** 当前缺少 Docker Desktop、Docker CLI、Docker Compose 和 WSL2；未拉取镜像、未启动任何 RAGFlow 容器、未配置模型 key。
+
+**旧问题复核：**
+
+| 问题 | 新机结论 |
+| --- | --- |
+| KI-001：C 盘空间 | **已解决**：79.31 GB ≥ 50 GB，无需迁移即可开始安装 |
+| KI-002：Docker VM 内存 | **仍存在 / 未验证**：Docker 未安装，VM 不存在；15.96 GB 主机按默认约 50% 仍只有约 8 GB，安装后必须设置 `.wslconfig` 到 12 GB 再复测 |
+| KI-004：物理内存 | **仍存在**：15.96 GB < 16 GB，差 0.04 GB；WARN，不构成硬阻塞，但无余量 |
+| KI-010（新） | **P1 阻塞**：Docker Desktop 与 WSL2 未安装/未启用，第二步无法开始 |
+| KI-011（新） | **P2 待确认**：Windows 10 22H2 常规支持已于 2025-10-14 结束，Docker 官方支持状态需先确认 |
+
+**进入第二步前的最小动作（本次均未执行）：**
+
+1. 启用 WSL2 并升级到 ≥ 2.1.5：管理员 PowerShell 执行 `wsl --install`，重启后执行 `wsl --update`，用 `wsl --version` 确认。
+2. 安装 Docker Desktop（WSL2 后端），启动并接受许可，确认 `docker --version`、`docker compose version`、`docker info` 均可用。
+3. 新建 `%UserProfile%\.wslconfig`，设置 `memory=12GB`、`processors=6`、`swap=4GB`；`wsl --shutdown` 后重启 Docker Desktop，确认 `docker info` 的 `MemTotal` ≥ 12 GB。
+4. 复核 `vm.max_map_count=262144` 与 8080 端口，重跑 `scripts/check-env.ps1 -Drive C`；关键项通过后再进入部署。
+
+详细安装步骤、兼容性风险与验收标准见 [known-issues.md](known-issues.md) 的 KI-010、KI-011。
+
+### 4.2 旧机基线（2026-10-17，历史保留）
+
+<details>
+<summary>展开旧机实测表</summary>
+
+| 检查项 | 旧机实测 | RAGFlow v0.27.2 要求 | 旧机结论 |
 | --- | --- | --- | --- |
 | 操作系统 | Windows 11 家庭中文版，Build 26200，64 位 | Windows 10/11 x64 | ✅ |
 | CPU | AMD Ryzen 5 5500U，6 核 12 线程 | ≥ 4 核 | ✅ |
@@ -111,23 +159,9 @@ flowchart LR
 | `vm.max_map_count` | 262144 | ≥ 262144 | ✅ |
 | 8080 端口 | 空闲 | 供 Web UI 使用 | ✅ |
 
-**Docker 就绪结论：是。** Docker Desktop 4.89.0 已安装，引擎启动后 Docker 29.7.2、Compose v5.5.0 均满足 RAGFlow 的版本要求，`docker info` 与 `vm.max_map_count` 检查通过。
+</details>
 
-补充事实：
-
-- 检查开始时 Docker Desktop 引擎**未运行**（`npipe:////./pipe/dockerDesktopLinuxEngine` 不存在）；启动 Docker Desktop 后约 15 秒引擎就绪。后续每次演示前需先启动 Docker Desktop。
-- 官方镜像为 x86_64；本机为 AMD64，架构匹配。
-- RAGFlow 官方要求 Python ≥ 3.13 仅适用于源码方式构建；本项目使用官方预构建镜像，不依赖本机 Python。
-
-**资源缺口（进入第二步前必须处理）：**
-
-| 缺口 | 实测 | 要求 | 处理方案 |
-| --- | --- | --- | --- |
-| C 盘空间 | 16.46 GB | 50 GB | 将 Docker Desktop 磁盘镜像迁到 D 盘（可用 216.8 GB），并清理 C 盘；见 KI-001 |
-| Docker VM 内存 | 7.43 GB | 建议 12 GB+ | 在 `%UserProfile%\.wslconfig` 设置 `memory=12GB`，重启 Docker Desktop；见 KI-002 |
-| 物理内存 | 15.34 GB | 16 GB | 关闭其他占用内存的应用，按 12 GB 上限运行；演示可接受但无余量 |
-
-结论：**Docker 已就绪，但资源未达标。** 第一步不启动部署；第二步开始前先按 [known-issues.md](known-issues.md) 处理 KI-001、KI-002。
+旧机 Docker 已就绪但资源未达标：C 盘 16.46 GB 不足（KI-001）、Docker VM 7.43 GB 偏低（KI-002）、物理内存 15.34 GB 略低（KI-004）。该结论不适用于新机，仅作历史对照。
 
 ## 5. 仓库结构
 
