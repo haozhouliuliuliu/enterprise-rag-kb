@@ -1,0 +1,62 @@
+{
+  "version": "0.3-spotcheck",
+  "description": "22 份虚构资料入库后的 5 类文档抽查题；每题使用 query 模式并核对 Top-5 检索与回答引用。",
+  "workspace_hint": "enterprise-rag-kb",
+  "questions": [
+    {
+      "id": "SPOT-01",
+      "question": "X-100S 产品说明书中额定功率 8 W 写在哪里？",
+      "type": "产品说明书/精确参数",
+      "mode": "query",
+      "expected": "8 W，来源为 X-100S 产品说明书",
+      "judge": {
+        "must_include_any": ["8 W", "8W", "8 瓦"],
+        "expected_sources": ["X-100S"]
+      }
+    },
+    {
+      "id": "SPOT-02",
+      "question": "X-100 系列成品检验规范 V2.1 中绝缘电阻 500 MΩ 的要求",
+      "type": "质量规范/版本冲突",
+      "mode": "query",
+      "expected": "≥500 MΩ（500 VDC），来源为 QS-001 V2.1，而不是 V2.0 的 100 MΩ",
+      "judge": {
+        "must_include_all": ["500", "MΩ"],
+        "expected_sources": ["V2.1"]
+      }
+    },
+    {
+      "id": "SPOT-03",
+      "question": "M-3 Pro 全自动扭矩装配台操作手册 默认锁付扭矩 12.0 N·m",
+      "type": "设备手册/精确参数",
+      "mode": "query",
+      "expected": "12.0 N·m，来源为 M-3 Pro 操作手册",
+      "judge": {
+        "must_include_all": ["12", "N·m"],
+        "expected_sources": ["M-3 Pro"]
+      }
+    },
+    {
+      "id": "SPOT-04",
+      "question": "X-100 系列包装与运输规范 堆码 5 层",
+      "type": "包装规范/精确参数",
+      "mode": "query",
+      "expected": "不超过 5 层，来源为包装与运输规范",
+      "judge": {
+        "must_include_any": ["5 层", "5层"],
+        "expected_sources": ["包装与运输规范"]
+      }
+    },
+    {
+      "id": "SPOT-05",
+      "question": "X-100 出厂检验报告样例 绝缘电阻 620 MΩ",
+      "type": "检验报告样例/精确参数",
+      "mode": "query",
+      "expected": "620 MΩ，来源为 X-100 出厂检验报告样例",
+      "judge": {
+        "must_include_all": ["620", "MΩ"],
+        "expected_sources": ["X-100 出厂检验报告样例"]
+      }
+    }
+  ]
+}
