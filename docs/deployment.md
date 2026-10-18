@@ -74,9 +74,13 @@ Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' |
 | --- | --- | --- |
 | 入库前（2026-10-18 18:05） | `D:\RAG库\backup\anythingllm-20261018-180531` | `anythingllm.db`（约 0.38 MB）、空 `documents`、空 `lancedb` |
 | 入库后（2026-10-18 18:45） | `D:\RAG库\backup\anythingllm-post-ingest-20261018-184559` | `anythingllm.db`（约 0.5 MB）、`documents`（约 0.05 MB）、`lancedb`（约 0.14 MB） |
+| 第三步复核（2026-10-18 19:13） | `D:\RAG库\backup\anythingllm-step3-rerun-20261018-191323` | 同上，复核时 22 份文档/22 个 chunk 仍在 |
 
 入库前备份在应用完全退出后复制；入库后备份使用 SQLite 在线备份 API，并复制
-`documents` 与 `lancedb`。两份备份均保存在 D 盘，不进入 Git。
+`documents` 与 `lancedb`。三份备份均保存在 D 盘，不进入 Git。
+
+> 2026-10-18 19:13 的复核确认：22 份文档和 22 个 chunk 未丢失；本轮未重复生成、
+> 未重复上传，避免产生重复文档。
 
 再备份命令：
 

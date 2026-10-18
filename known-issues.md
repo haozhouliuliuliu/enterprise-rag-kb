@@ -22,6 +22,7 @@
 | KI-011 | INFO | Windows 10 22H2 已过常规支持期 | 原生应用不依赖 Docker 的系统支持期；降级为 INFO，安全补丁仍需关注 | 已知限制 |
 | KI-012 | P2 | 从带 `ELECTRON_RUN_AS_NODE=1` 的 Shell 启动会误入 Node 模式 | 已定位；正常双击启动不受影响 | 已规避 |
 | KI-013 | P1 | i7-3770 不支持 AVX2，LanceDB cosine 检索触发非法指令 | 已用本机 JS-cosine 补丁规避；升级后需重做 | 已规避 |
+| KI-014 | P2 | 用户称已轮换 key，但本机文件/应用仍是上一轮 key | 当前 key 可用；新 key 未落地，需确认 | 待处理 |
 
 ---
 
@@ -106,7 +107,7 @@
   - Developer API `GET /workspaces` 返回 2 个 workspace；
   - `SMOKE-01` 调用成功，回答 `EVAL_OK`，判定“命中”。
 - **未覆盖**：真实文档上传后的 chunk/embedding/检索/引用链路，留到第三步资料入库时验证。
-- **证据**：`docs/deployment.md` 第 6.3、8 节；`tests/results/eval-20261018-175648.md`。
+- **证据**：`docs/deployment.md` 第 6.3、8 节；`tests/results/eval-20261018-191433.md`。
 
 ## KI-010：新机未安装 Docker Desktop/WSL2
 
@@ -150,3 +151,17 @@
   4. 该补丁仅对本机有效，AnythingLLM 升级会覆盖，需重新评估/应用。
 - **验证**：5 道抽查题 Top-5 检索 5/5 命中，回答 5/5 命中。
 - **后续**：若换到支持 AVX2 的机器，优先恢复上游原生 cosine 检索，不保留该补丁。
+
+## KI-014：声称轮换的 key 未在本机落地
+
+- **级别**：P2（安全/配置一致性）
+- **状态**：待处理
+- **现象**：用户告知已轮换百炼 key 与 Developer API key，但本机文件时间戳仍为上一轮：
+  `C:\RAG库\secrets\dashscope.key`（17:27）、`anythingllm_api.key`（17:46）、仓库 `.env`（17:46）。
+- **证据**：哈希比对显示仓库 Developer key 与 secrets 文件相同；应用 `storage/.env` 的模型 key 与旧 secrets 相同；但 Developer API、DashScope chat、SMOKE-01 与 5 题抽查均返回成功。
+- **影响**：若旧 key 已在云端吊销，后续调用会失败；若未吊销，旧 key 仍有效，轮换目的未达到。
+- **规避/后续**：
+  1. 由用户确认新 key 是否已在这台机器生效；
+  2. 如未生效，重新更新 `storage\.env`、仓库 `.env` 与 secrets 文件，并重启 AnythingLLM；
+  3. 用 `tests/eval.py --id SMOKE-01` 与 5 题抽查复测；
+  4. 不要在本机保留旧 key 的额外副本。

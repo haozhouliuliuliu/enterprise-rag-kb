@@ -63,6 +63,17 @@ git diff --cached | Select-String -Pattern 'sk-|DASHSCOPE|ANYTHINGLLM_API_KEY|Be
   - 百炼账单出现异常调用。
 - **约束**：无论是否轮换，key 都不得写入仓库、README、测试结果或 commit。
 
+### 2.5 本轮 key 状态核验（2026-10-18 19:13）
+
+- 用户告知已轮换百炼 key 与 Developer API key，并更新 AnythingLLM 与本机 `.env`；
+- 实测本机 `C:\RAG库\secrets\dashscope.key`（mtime 17:27）、`anythingllm_api.key`（mtime 17:46）、
+  仓库 `.env`（mtime 17:46）与上一轮一致；哈希比对显示仓库 Developer key 与 secrets 文件相同，
+  应用 `storage/.env` 的模型 key 也与旧 secrets 相同；
+- 当前 key 仍可用：Developer API 200，DashScope chat 200，SMOKE-01 与 5 题抽查均通过；
+- **结论**：本机未检测到新 key 落地，可能更新未同步到这台机器。本轮没有再次改写 key，
+  避免与用户侧轮换冲突；如用户确认新 key 已生效，请重新执行本机文件/应用设置更新并复测。
+- 风险：若旧 key 已在云端吊销，后续调用会失败；若未吊销，旧 key 仍可能有效，应按泄露风险处理。
+
 ## 3. 数据分类与使用约束
 
 **允许**：

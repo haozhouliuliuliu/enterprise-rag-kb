@@ -249,4 +249,5 @@ enterprise-rag-kb/
 | 表格 PDF | B04 内容完整，行列结构被压平，无数值缺失 |
 | 备份 | 入库前 + 入库后两份，位于 `D:\RAG库\backup\` |
 | 已知兼容问题 | i7-3770 无 AVX2，已用本机 JS-cosine 补丁规避（KI-013） |
-| 详细结果 | `tests/results/eval-20261018-184425.md`、`tests/results/table-pdf-quality.md` |
+| 详细结果 | `tests/results/eval-20261018-191433.md`、`tests/results/table-pdf-quality.md` |
+| 复核（19:14） | 22 份文档/22 个 chunk 保持不变；5 题复跑仍 5/5；未重复上传 |
