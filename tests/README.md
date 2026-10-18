@@ -10,7 +10,8 @@
 | [questions.v0.2.json](questions.v0.2.json) | 评测脚本读取的 JSON 题集；当前含 1 道 API 连通性占位题 | 🔄 骨架 |
 | [eval.py](eval.py) | AnythingLLM Developer API 评测脚本（仅标准库） | ✅ 已就绪 |
 | [results/template.md](results/template.md) | 人工测试记录模板（旧版） | ✅ 已定义 |
-| `results/eval-*.json/.md` | 脚本生成的结构化结果与可读报告 | 🔄 运行后生成 |
+| `results/eval-*.json/.md` | 脚本生成的结构化结果与可读报告 | ✅ SMOKE-01 已运行 |
+| [results/eval-20261018-174809.md](results/eval-20261018-174809.md) | 占位题实测：回答 `EVAL_OK`，判定命中 | ✅ 通过 |
 
 ## 评测脚本用法
 
