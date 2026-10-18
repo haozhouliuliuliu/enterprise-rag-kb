@@ -68,6 +68,28 @@ Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' |
 - 注册表显示 `AnythingLLM 1.18.0`；
 - 安装器没有把应用装到 `%LOCALAPPDATA%\Programs`。
 
+### 3.1 备份记录
+
+| 备份点 | 路径 | 内容 |
+| --- | --- | --- |
+| 入库前（2026-10-18 18:05） | `D:\RAG库\backup\anythingllm-20261018-180531` | `anythingllm.db`（约 0.38 MB）、空 `documents`、空 `lancedb` |
+| 入库后（2026-10-18 18:45） | `D:\RAG库\backup\anythingllm-post-ingest-20261018-184559` | `anythingllm.db`（约 0.5 MB）、`documents`（约 0.05 MB）、`lancedb`（约 0.14 MB） |
+
+入库前备份在应用完全退出后复制；入库后备份使用 SQLite 在线备份 API，并复制
+`documents` 与 `lancedb`。两份备份均保存在 D 盘，不进入 Git。
+
+再备份命令：
+
+```powershell
+# SQLite 在线备份 + 数据目录复制（应用运行时也可执行）
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$dest = "D:\RAG库\backup\anythingllm-$stamp"
+New-Item -ItemType Directory -Path $dest -Force | Out-Null
+python -c "import sqlite3,os; s=sqlite3.connect(os.path.expandvars(r'%APPDATA%\anythingllm-desktop\storage\anythingllm.db')); d=sqlite3.connect(r'$dest\anythingllm.db'); s.backup(d); d.close(); s.close()"
+Copy-Item "$env:APPDATA\anythingllm-desktop\storage\documents" "$dest\documents" -Recurse
+Copy-Item "$env:APPDATA\anythingllm-desktop\storage\lancedb" "$dest\lancedb" -Recurse
+```
+
 ## 4. 启动
 
 正常启动：
@@ -194,6 +216,42 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/v1/workspace/new'
 | 校验结果 | `P1_07_WORKSPACE_EXISTS=1` |
 
 重启后 Developer API key 仍然有效，说明 `api_keys` 表与 workspace 元数据均已持久化。
+
+### 6.4 RAG 实际配置与分块结果
+
+| 参数 | 实测值 | 说明 |
+| --- | --- | --- |
+| Embedding 模型 | `text-embedding-v4` | 1024 维 |
+| Vector DB | LanceDB | 本地 `storage\lancedb\enterprise-rag-kb.lance` |
+| Chunk size | `8192` | AnythingLLM `RecursiveSplitter` 实际值 |
+| Chunk overlap | `20` | 实际值 |
+| Top-N | `5` | workspace 设置，用于评测 |
+| 相似度阈值 | `0.0` | 为兼容本机 L2/JS cosine 排序而下调 |
+| 文档数 | 22 | 12 DOCX + 10 PDF |
+| 总 chunk 数 | 22 | 每份文档 1 chunk |
+| 表格 PDF | `B04` QS-001 V2.0 | 1 chunk，内容完整，表格行列被压平 |
+
+> **分块观察**：默认 chunk size 8192 使每份文档只生成 1 个 chunk。表格数值完整保留，但
+> 行列边界在 chunk 文本中被压平；后续若要更细的引用粒度，建议把 chunk size 调到
+> 1000–1500 并重新入库。详见 `tests/results/table-pdf-quality.md` 与
+> `tests/results/table-pdf-chunks.md`。
+
+### 6.5 本机兼容性补丁（AVX2）
+
+本机 CPU 为 i7-3770，**不支持 AVX2**；LanceDB 官方要求 AVX2。直接使用
+`distanceType("cosine")` 会让后端进程以 `0xC000001D`（非法指令）退出。
+
+本机采用的非仓库补丁：
+
+- 备份原文件：`D:\RAG库\backup\server.js.original-20261018-182358`
+- 修改文件：`D:\RAG库\AnythingLLM\resources\backend\server.js`
+- 修改内容：不再调用 LanceDB 原生 `vectorSearch`，改为读取表行并在 Node 中计算
+  cosine（22 条向量，开销可忽略）；同时把 workspace 阈值设为 `0.0`。
+- 验证：`/vector-search` 与 `/chat` 均正常；5 道抽查题 5/5 命中。
+- **注意**：AnythingLLM 升级会覆盖该文件，升级后需重新评估/补丁；这不是上游正式修复。
+  该补丁仅适用于本机演示，不改变模型或应用选型。
+
+## 7. 启用 Developer API
 
 ## 7. 启用 Developer API
 

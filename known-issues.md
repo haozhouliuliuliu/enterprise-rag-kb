@@ -21,6 +21,7 @@
 | KI-010 | P1 | 新机未安装 Docker Desktop/WSL2 | **已通过更换底座规避**：原生应用不依赖 Docker/WSL2 | 已规避 |
 | KI-011 | INFO | Windows 10 22H2 已过常规支持期 | 原生应用不依赖 Docker 的系统支持期；降级为 INFO，安全补丁仍需关注 | 已知限制 |
 | KI-012 | P2 | 从带 `ELECTRON_RUN_AS_NODE=1` 的 Shell 启动会误入 Node 模式 | 已定位；正常双击启动不受影响 | 已规避 |
+| KI-013 | P1 | i7-3770 不支持 AVX2，LanceDB cosine 检索触发非法指令 | 已用本机 JS-cosine 补丁规避；升级后需重做 | 已规避 |
 
 ---
 
@@ -133,3 +134,19 @@
 - **证据**：`Get-ChildItem Env:` 显示 `ELECTRON_RUN_AS_NODE=1`；清除后应用正常启动，出现 4 个 Electron 进程并监听 3001。
 - **影响**：仅影响从该 Shell 启动的场景；普通双击启动不受影响。
 - **规避**：启动前执行 `Remove-Item Env:ELECTRON_RUN_AS_NODE`，或从开始菜单/快捷方式启动。详见 `docs/deployment.md` 排障。
+
+## KI-013：i7-3770 缺少 AVX2，LanceDB cosine 检索崩溃
+
+- **级别**：P1（本机检索阻塞）
+- **状态**：**已规避（本机补丁）**
+- **现象**：调用 `/api/v1/workspace/.../vector-search` 或 `/chat` 时，AnythingLLM 后端进程直接退出，端口 3001 消失；日志无异常堆栈。
+- **根因**：LanceDB 官方要求 x86 平台支持 AVX2；本机 Intel Core i7-3770 仅有 AVX，不支持 AVX2。直接调用 LanceDB `vectorSearch(...).distanceType("cosine")` 返回 `0xC000001D`（非法指令）；默认 L2 检索可执行。
+- **证据**：Node 直接执行 cosine 检索退出码 `-1073741795`；L2 检索正常；LanceDB issue #1437 明确说明 AVX2 要求。
+- **影响**：不修补则无法用 AnythingLLM 检索，无法完成引用验收。
+- **规避**：
+  1. 本机将 `resources\backend\server.js` 的 LanceDB `similarityResponse` 改为读取表行、在 Node 中计算 cosine（22 条向量，开销可忽略），不再调用原生 cosine 检索；
+  2. workspace `similarityThreshold=0.0`、`topN=5`；
+  3. 原文件备份：`D:\RAG库\backup\server.js.original-20261018-182358`；
+  4. 该补丁仅对本机有效，AnythingLLM 升级会覆盖，需重新评估/应用。
+- **验证**：5 道抽查题 Top-5 检索 5/5 命中，回答 5/5 命中。
+- **后续**：若换到支持 AVX2 的机器，优先恢复上游原生 cosine 检索，不保留该补丁。
