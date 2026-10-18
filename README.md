@@ -2,237 +2,207 @@
 
 企业内部 RAG 知识库（本地演示验证版）：员工上传 PDF/Word，用自然语言提问，系统检索文档后生成回答，并标明引用来源。
 
-> **第一版范围**：在单台企业内部 Windows 电脑上用 Docker 本地演示验证；不购买云服务器、不部署本地大模型、不做公网暴露。
+> **第一版范围**：在单台企业内部 Windows 电脑上本地演示；不购买云服务器、不部署本地大模型、不做公网暴露。
 >
-> **当前进度**：第一步（项目初始化与环境准备）已完成。**尚未启动 RAGFlow，也未导入任何资料**，部署与入库属于第二步。
+> **当前底座**：AnythingLLM Desktop v1.18.0（原生 Windows 应用，不依赖 Docker/WSL2）。
 >
-> **换机 / 新会话交接**：先读 [HANDOFF.md](HANDOFF.md)，按其中的“新电脑对接步骤”只做环境复核，不要直接开始部署。
+> **当前进度**：RAGFlow 方案已废弃；AnythingLLM 已安装并启动，正在完成模型配置、workspace、持久化验证与评测通道。
+>
+> **换机 / 新会话交接**：先读 [HANDOFF.md](HANDOFF.md) 顶部的底座变更说明，再按 [docs/deployment.md](docs/deployment.md) 操作。HANDOFF 中的 RAGFlow 步骤仅作历史记录。
 
 ## 1. 目标与验收标准
 
 | 验收项 | 第一版如何满足 |
 | --- | --- |
-| 上传 PDF/Word | RAGFlow 知识库上传，DeepDoc 解析 PDF/Word |
-| 自然语言聊天查询 | RAGFlow 内置聊天助手，基于知识库检索问答 |
-| 回答标明引用来源 | RAGFlow 的 chunk 级引用：回答中的引用编号可展开为原始文档片段 |
-| 本地演示、无云服务器 | Docker Desktop 在本机运行，全部组件本地容器化 |
-| 不部署本地大模型 | 只调用在线模型 API（阿里云百炼） |
+| 上传 PDF/Word | AnythingLLM workspace 上传，内置解析器提取文本 |
+| 自然语言聊天查询 | workspace 聊天，检索本地向量库后调用 `qwen-plus` |
+| 回答标明引用来源 | 回答下方展示 sources/chunk 片段，可展开核对 |
+| 本地演示、无云服务器 | AnythingLLM Desktop 运行在本机；仅模型调用走外部 API |
+| 不部署本地大模型 | 对话与 Embedding 均使用阿里云百炼在线 API |
 
-## 2. 技术选型（决策记录）
+**v0.2 验收基准（后续所有测试以此为准）：**
 
-### 2.1 选型结论
+| 指标 | 目标 |
+| --- | --- |
+| 检索命中 | 可回答问题中 **≥ 80%** 能在检索结果前 5 条中找到相关依据 |
+| 回答有据 | 可回答问题中 **≥ 80%** 的最终回答提供真实、足以支持回答的来源 |
+| 正确拒答 | **5 道无答案问题中 ≥ 4 道**明确表示资料不足，不编造 |
+| 可复现 | 每题都有预期结果或明确判定规则，不能只记录 AI 输出 |
 
-| 层次 | 选型 | 版本 | 说明 |
-| --- | --- | --- | --- |
-| RAG 应用 | **RAGFlow** | **v0.27.2**（当前最新稳定版） | 唯一选用的 RAG 基础应用，**不安装 Dify** |
-| 文档解析 | RAGFlow 内置 DeepDoc | 随镜像 | 版面分析、表格识别、OCR，覆盖 PDF/Word |
-| 向量数据库 | **Elasticsearch** | 8.11.3 | 使用 RAGFlow 官方 compose 自带组件，不单独搭建 |
-| 元数据库 | MySQL | 8.0.40 | compose 自带 |
-| 对象存储 | MinIO 兼容服务（`pgsty/silo`） | 随 compose 固定 | compose 自带，保存原始文件 |
-| 缓存 | Valkey | 8 | compose 自带，替代 Redis |
-| 对话大模型 | 阿里云百炼 `qwen-plus` | 在线 API | 通过 OpenAI 兼容接口接入 |
-| Embedding | 阿里云百炼 `text-embedding-v4` | 在线 API | 与对话模型共用一把 API key |
-| 容器运行时 | Docker Desktop + Docker Compose | 见第 4 节 | Windows 本机运行 |
+## 2. ADR-001：底座从 RAGFlow 切换为 AnythingLLM
 
-### 2.2 为什么选 RAGFlow，而不是 Dify
+- **状态**：Accepted（2026-10-18）
+- **决策**：废弃 RAGFlow + Docker Desktop 方案，改用 **AnythingLLM Desktop v1.18.0** 作为唯一 RAG 应用。
+- **取代**：v0.1 的 RAGFlow 选型；`docs/ragflow/` 与 `docs/deployment.md` 的旧版本仅作历史参考。
 
-1. **chunk 级引用能力直接满足验收要求。** RAGFlow 的回答会附带可展开的引用列表，引用能定位到具体文档的 chunk（片段），而不是只给一个文件名。验收要求“标明原始文件依据”，这一点是决定性因素。官方特性说明见 [RAGFlow README · Grounded citations](https://github.com/infiniflow/ragflow/blob/v0.27.2/README.md#-grounded-citations-with-reduced-hallucinations)。
-2. **复杂文档解析更贴合企业资料。** 产品说明书、检验规范、设备手册通常含表格、页眉页脚和扫描页；RAGFlow 的 DeepDoc 提供版面分析、表格识别与 OCR，切片结果可在界面中人工检查、干预。
-3. **一体化程度高。** 解析、切片、索引、检索、对话、引用在一个应用内完成，官方 compose 已包含 Elasticsearch、MySQL、MinIO、Valkey，不需要额外拼装。
-4. **许可证与部署方式适合企业内部。** Apache-2.0，支持本地 Docker 私有化部署。
-5. **不装 Dify 的理由。** Dify 更偏工作流/Agent 编排，知识库只是其中一块；本项目的验收重点是“文档解析质量 + chunk 可追溯引用”，RAGFlow 更直接。同时部署两套系统会显著增加内存、磁盘和运维负担，本机资源（见第 4 节）也不允许，因此明确只选一套。
+### 2.1 背景
 
-### 2.3 为什么不单独搭向量数据库
+v0.1 方案选择 RAGFlow v0.27.2，依赖 Docker Desktop + WSL2，并由官方 compose 拉起 Elasticsearch 8.11.3、MySQL 8.0.40、MinIO/SILO、Valkey 8。目标机实测环境为：
 
-RAGFlow 官方 compose 通过 `DOC_ENGINE` 选择文档引擎，默认使用 Elasticsearch 8.11.3，并同时提供 MySQL、MinIO、Valkey。第一版直接复用这套集成组件：
+- Windows 10 Pro 22H2，Build 19045.5854；
+- Intel Core i7-3770，4 核 8 线程；
+- 物理内存 15.96 GB；
+- C 盘可用 79.31 GB，D 盘可用 320.75 GB；
+- **Docker Desktop、Docker CLI、Compose、WSL2 均未安装/未启用**；
+- 旧机 Docker VM 仅 7.43 GB，低于 RAGFlow 演示建议的 12 GB。
 
-- 避免重复占用内存和磁盘；
-- 避免版本兼容问题（RAGFlow 对 ES 版本和 mapping 有要求）；
-- 部署步骤更少，演示更稳定。
+即使磁盘空间已达标，RAGFlow 仍需先启用 WSL2、安装 Docker Desktop、迁移/调优 Docker VM 内存，再拉起多个基础组件容器。对一台 2012 年平台、16 GB 内存的演示机，这套底座的安装复杂度、内存压力和故障面都偏高，且第二步尚未开始就已出现 Docker/WSL 阻塞。
 
-后续数据量或并发上升时，再评估切换 Infinity、OpenSearch 或外部 Elasticsearch 集群。
+### 2.2 决策理由
 
-### 2.4 在线模型服务与密钥管理
+1. **原生 Windows 应用，去掉 Docker/WSL2 依赖。** AnythingLLM Desktop 直接安装运行，不需要 Docker Desktop、WSL2、Hyper-V 或 Linux 虚拟机，直接规避 KI-002（Docker VM 内存）与 KI-010（Docker/WSL 缺失）。
+2. **资源占用更符合目标机。** 不再需要为 Elasticsearch/MySQL/MinIO/Valkey 预留 12 GB 级 VM 内存；16 GB 物理内存可以留给 Windows、浏览器和应用本身。
+3. **仍然满足核心验收。** AnythingLLM 支持 workspace、PDF/Word 上传、本地向量检索、回答下方 sources/chunk 引用，能验证“检索—回答—引用”闭环。
+4. **自带 Developer API，便于可复现评测。** 可在设置中启用 API，用脚本逐题调用并记录回答、来源与判定，不必手工截图。
+5. **单一应用、单机演示。** 不引入 Dify、不引入第二套 RAG 应用，符合“只装一套”的约束。
 
-第一版只接入**一个**在线模型服务：阿里云百炼（DashScope）。
+### 2.3 代价与风险
 
-- 对话模型：`qwen-plus`，OpenAI 兼容地址 `https://dashscope.aliyuncs.com/compatible-mode/v1`
-- Embedding：`text-embedding-v4`（RAGFlow 的 Tongyi-Qianwen 提供方已内置该模型）
-- 一个 `DASHSCOPE_API_KEY` 同时覆盖对话与向量化，减少密钥数量
-- 选择理由：国内网络可直连、中文文档与中文语义效果好、按量计费适合演示、RAGFlow 原生支持该提供方
+| 代价/风险 | 说明 | 应对 |
+| --- | --- | --- |
+| 数据出本机 | chunk 文本与问题会发送至阿里云百炼 | 只用虚构资料；在架构与安全文档中明示 |
+| 解析/切片可控性较弱 | 不如 RAGFlow 的 DeepDoc 可调参数多 | 第一版先跑通；解析质量不足时再评估专用解析器 |
+| 引用粒度依赖应用 | sources 为 chunk 级，但展示形式受 AnythingLLM 限制 | 用 `sources[].chunk` 与人工核对双重验证 |
+| 桌面版单用户 | 无 SSO、多租户、细粒度权限 | 第一版定位为单机演示，不扩展到生产 |
+| 外部模型依赖 | 百炼欠费/限流会导致问答失败 | 演示前检查额度；记录为已知依赖 |
 
-密钥管理规则：
+### 2.4 复审条件
 
-1. API key 只通过环境变量或本机 `.env` 提供，**禁止写入代码、文档、截图或 commit**。
-2. 仓库只提交 `.env.example` 占位模板；`.env` 已被 `.gitignore` 忽略。
-3. RAGFlow 的模型 key 在 Web 界面中配置并保存在本地 MySQL；配置时不得把真实 key 粘贴进任何仓库文件。
-4. 后续如需切换模型（如 DeepSeek、智谱 GLM），只改 RAGFlow 模型配置，不改业务数据。
+出现以下情况时重新评估底座：
 
-> 备选：DeepSeek 的 `deepseek-chat` 也兼容 OpenAI 协议，可用于对话；但它不提供 embedding，仍需百炼做向量化。第一版为降低复杂度不启用双供应商。
+- AnythingLLM 无法满足 chunk 级引用验收；
+- 需要多用户、权限隔离、审计或高可用；
+- 企业要求数据完全不出内网；
+- 文档解析质量成为主要瓶颈，且应用内无法调优。
 
-## 3. 架构与引用链路
+## 3. 技术选型
+
+| 层次 | 选型 | 版本/说明 |
+| --- | --- | --- |
+| RAG 应用 | **AnythingLLM Desktop** | **v1.18.0**，原生 Windows 应用，不装 Dify |
+| 文档解析 | AnythingLLM 内置解析器 | PDF/Word 文本提取、切片 |
+| 向量库 | LanceDB | AnythingLLM 内置，本地文件 |
+| 元数据 | SQLite | AnythingLLM 内置 |
+| 对话模型 | 阿里云百炼 `qwen-plus` | OpenAI 兼容接口 |
+| Embedding | 阿里云百炼 `text-embedding-v4` | 与对话共用 `DASHSCOPE_API_KEY` |
+| 接口地址 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 百炼 OpenAI 兼容模式 |
+| 容器 | **无** | 不使用 Docker/WSL2 |
+| 评测通道 | AnythingLLM Developer API + Python | `tests/eval.py`，仅标准库 |
+
+**不选 Dify 的理由**：本项目只需要单机文档问答与引用，不需要工作流/Agent 编排；再部署一套应用会增加资源和运维负担。
+
+**不再选 RAGFlow 的理由**：见 ADR-001。
+
+## 4. 架构与引用链路
+
+完整架构、数据流与外部服务边界见 [docs/architecture.md](docs/architecture.md)。
 
 ```mermaid
 flowchart LR
-  U[员工浏览器] -->|HTTP :8080| RF[RAGFlow Web / API]
-  RF -->|解析、切片| DD[DeepDoc]
-  DD -->|chunk + 向量| ES[(Elasticsearch 8.11.3)]
-  DD -->|原始文件| MO[(MinIO)]
-  RF -->|元数据| DB[(MySQL 8.0.40)]
-  RF -->|对话 / Embedding| DS[阿里云百炼<br/>qwen-plus / text-embedding-v4]
-  RF -->|回答 + chunk 引用| U
+  U[员工] -->|本机 3001| A[AnythingLLM Desktop]
+  A -->|原文/索引| L[(本机 SQLite + LanceDB)]
+  A -->|chunk 文本| E[百炼 text-embedding-v4]
+  A -->|问题 + Top-N chunks| Q[百炼 qwen-plus]
+  Q -->|回答| A
+  A -->|回答 + chunk 引用| U
 ```
 
-一次问答的引用链路：
+**引用链路：**
 
-1. 员工上传 PDF/Word，RAGFlow 保存原始文件并解析为文本块（chunk）。
-2. 每个 chunk 生成向量写入 Elasticsearch，同时记录所属文档、页码/位置等元数据。
-3. 提问时，问题向量召回相关 chunk，拼装为上下文发送给 `qwen-plus`。
-4. 模型回答中携带引用编号；RAGFlow 把编号映射回 chunk，在回答下方展示“引用来源”。
-5. 点击引用可查看命中的原始片段，从而核对答案依据。
+1. 上传 PDF/Word，在本机解析、切片；
+2. chunk 文本发送到百炼生成向量，向量写入本机 LanceDB；
+3. 提问时问题向量化，本机检索 Top-N chunk；
+4. 问题与 chunk 发送给 `qwen-plus`，返回回答；
+5. AnythingLLM 把回答与 chunk 元数据关联，展示 sources；
+6. 验收时检查引用片段是否真的支持回答。
 
-**验收判定口径**：每条包含事实性结论的回答，至少能展开 1 条引用；引用必须能定位到具体文件与片段，而不是只有文件名。
+> **数据边界**：文档切片和问答内容会发送至百炼（阿里云）外部服务；原始文件留在本机，但文本内容会离开本机。只允许虚构资料。
 
-## 4. 环境检查（Windows / Docker）
+## 5. 环境检查（新机实测）
 
-### 4.1 新机实测（2026-10-18，交接复核）
+检查时间：2026-10-18。旧机 RAGFlow/Docker 数据保留在 [known-issues.md](known-issues.md) 作为历史。
 
-检查时间：2026-10-18 16:40（Asia/Shanghai）。下列数值均为新机实测，旧机数据保留在 4.2 节作历史对照。检查脚本：[scripts/check-env.ps1](scripts/check-env.ps1)（只读，不拉镜像、不启动容器）。
+| 项目 | 实测值 | 说明 |
+| --- | --- | --- |
+| 操作系统 | Windows 10 Pro 22H2，Build 19045.5854，64 位 | 原生应用可运行；系统已过常规支持期，见 KI-011 |
+| CPU | Intel Core i7-3770，4 核 8 线程，3.40 GHz | 满足桌面应用与在线模型调用 |
+| 物理内存 | 15.96 GB | 不再需要 12 GB Docker VM，资源压力显著降低 |
+| C 盘可用 | 79.31 GB / 150 GB | 满足安装与数据目录 |
+| D 盘可用 | 320.75 GB / 326.93 GB | AnythingLLM 安装在此 |
+| AnythingLLM | v1.18.0，安装于 `D:\RAG库\AnythingLLM` | 安装包签名有效（Mintplex Labs） |
+| 本机服务 | `127.0.0.1:3001`（应用/API）、`127.0.0.1:8888`（collector） | 仅本机监听 |
+| 数据目录 | `%APPDATA%\anythingllm-desktop` | 本机为 `C:\Users\Administrator\AppData\Roaming\anythingllm-desktop` |
+| Docker/WSL2 | 未安装/未启用 | **已不需要**；KI-002、KI-010 通过更换底座规避 |
+| 8080 端口 | 空闲 | 本方案不使用 8080；AnythingLLM 使用 3001 |
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-env.ps1 -Drive C
-```
+**资源结论**：RAGFlow 时代的 C 盘、Docker VM 内存、WSL2 阻塞均已不再适用；当前主机满足 AnythingLLM 桌面版演示条件。
 
-| 检查项 | 新机实测 | RAGFlow v0.27.2 要求 | 结论 |
-| --- | --- | --- | --- |
-| 操作系统 | Windows 10 Pro 22H2，Build 19045.5854，64 位 | Windows 10/11 x64 | ⚠️ 满足文档要求，但已过常规支持期（KI-011） |
-| CPU | Intel Core i7-3770，4 核 8 线程，3.40 GHz | ≥ 4 核 | ✅ 核数达标，低于旧机 6 核 12 线程 |
-| 物理内存 | 15.96 GB | ≥ 16 GB | ⚠️ 差 0.04 GB（KI-004） |
-| C 盘可用空间 | 79.31 GB / 150 GB | ≥ 50 GB | ✅ **KI-001 已解决** |
-| D 盘可用空间 | 320.75 GB / 326.93 GB | 备用数据盘 | ✅ |
-| WSL | 未安装；WSL、VirtualMachinePlatform、Hyper-V 功能均 Disabled；`wsl.exe` 10.0.19041.5794（inbox），无发行版 | Docker Desktop WSL2 后端要求 WSL ≥ 2.1.5 | ❌ 缺失 |
-| Docker Desktop | 未安装（无安装目录、无服务、无进程） | 4.x | ❌ 缺失 |
-| Docker CLI | not found | ≥ 24.0.0 | ❌ 缺失 |
-| Docker Compose | not found | ≥ v2.26.1 | ❌ 缺失 |
-| Docker 引擎 | not reachable | 已安装且运行 | ❌ 缺失 |
-| Docker VM 资源 | 不可测（Docker 未安装） | 演示建议 ≥ 12 GB | ❓ 未验证 |
-| `vm.max_map_count` | 不可测（无 `docker-desktop` 发行版） | ≥ 262144 | ❓ 未验证 |
-| 8080 端口 | 空闲 | 供 Web UI 使用 | ✅ |
-
-**环境结论：不满足第二步启动条件。** 当前缺少 Docker Desktop、Docker CLI、Docker Compose 和 WSL2；未拉取镜像、未启动任何 RAGFlow 容器、未配置模型 key。
-
-**旧问题复核：**
-
-| 问题 | 新机结论 |
-| --- | --- |
-| KI-001：C 盘空间 | **已解决**：79.31 GB ≥ 50 GB，无需迁移即可开始安装 |
-| KI-002：Docker VM 内存 | **仍存在 / 未验证**：Docker 未安装，VM 不存在；15.96 GB 主机按默认约 50% 仍只有约 8 GB，安装后必须设置 `.wslconfig` 到 12 GB 再复测 |
-| KI-004：物理内存 | **仍存在**：15.96 GB < 16 GB，差 0.04 GB；WARN，不构成硬阻塞，但无余量 |
-| KI-010（新） | **P1 阻塞**：Docker Desktop 与 WSL2 未安装/未启用，第二步无法开始 |
-| KI-011（新） | **P2 待确认**：Windows 10 22H2 常规支持已于 2025-10-14 结束，Docker 官方支持状态需先确认 |
-
-**进入第二步前的最小动作（本次均未执行）：**
-
-1. 启用 WSL2 并升级到 ≥ 2.1.5：管理员 PowerShell 执行 `wsl --install`，重启后执行 `wsl --update`，用 `wsl --version` 确认。
-2. 安装 Docker Desktop（WSL2 后端），启动并接受许可，确认 `docker --version`、`docker compose version`、`docker info` 均可用。
-3. 新建 `%UserProfile%\.wslconfig`，设置 `memory=12GB`、`processors=6`、`swap=4GB`；`wsl --shutdown` 后重启 Docker Desktop，确认 `docker info` 的 `MemTotal` ≥ 12 GB。
-4. 复核 `vm.max_map_count=262144` 与 8080 端口，重跑 `scripts/check-env.ps1 -Drive C`；关键项通过后再进入部署。
-
-详细安装步骤、兼容性风险与验收标准见 [known-issues.md](known-issues.md) 的 KI-010、KI-011。
-
-### 4.2 旧机基线（2026-10-17，历史保留）
-
-<details>
-<summary>展开旧机实测表</summary>
-
-| 检查项 | 旧机实测 | RAGFlow v0.27.2 要求 | 旧机结论 |
-| --- | --- | --- | --- |
-| 操作系统 | Windows 11 家庭中文版，Build 26200，64 位 | Windows 10/11 x64 | ✅ |
-| CPU | AMD Ryzen 5 5500U，6 核 12 线程 | ≥ 4 核 | ✅ |
-| 物理内存 | 15.34 GB | ≥ 16 GB | ⚠️ 略低于建议值 |
-| C 盘可用空间 | 16.46 GB（D 盘可用 216.8 GB） | ≥ 50 GB | ❌ 不足 |
-| Docker CLI | 29.7.2 | ≥ 24.0.0 | ✅ |
-| Docker Compose | v5.5.0 | ≥ v2.26.1 | ✅ |
-| Docker 引擎 | 运行中，29.7.2 | 已安装且运行 | ✅ |
-| Docker Desktop | 4.89.0.238018 | 4.x | ✅ |
-| Docker VM 资源 | 12 CPU / 7.43 GB 内存 / overlayfs | 演示建议 ≥ 12 GB | ⚠️ 内存偏低 |
-| `vm.max_map_count` | 262144 | ≥ 262144 | ✅ |
-| 8080 端口 | 空闲 | 供 Web UI 使用 | ✅ |
-
-</details>
-
-旧机 Docker 已就绪但资源未达标：C 盘 16.46 GB 不足（KI-001）、Docker VM 7.43 GB 偏低（KI-002）、物理内存 15.34 GB 略低（KI-004）。该结论不适用于新机，仅作历史对照。
-
-## 5. 仓库结构
+## 6. 仓库结构
 
 ```text
 enterprise-rag-kb/
-├── README.md               # 项目说明、选型决策、环境结论
-├── known-issues.md         # 已知问题清单
-├── .env.example            # 密钥占位模板（不含真实值）
+├── README.md                    # 目标、ADR-001、选型、环境结论
+├── HANDOFF.md                   # 交接说明（顶部有底座变更提示）
+├── known-issues.md              # 已知问题与历史状态
 ├── docs/
-│   ├── deployment.md       # RAGFlow 部署步骤与官方 compose 配置
-│   ├── design.md           # 方案设计与取舍
-│   ├── tooling.md          # 辅助工具使用记录（skill-atlas）
-│   └── ragflow/            # 官方 compose 配置快照（v0.27.2）
-├── data/                   # 虚构企业资料源文件与清单
-├── tests/                  # 测试问题、期望引用与结果
-└── scripts/                # 环境检查脚本
+│   ├── deployment.md            # AnythingLLM 安装、模型配置、验证
+│   ├── architecture.md          # 架构、数据流、外部服务边界
+│   ├── security.md              # 密钥、虚构数据、外部数据流
+│   ├── design.md                # 设计说明（v0.2 入口）
+│   ├── tooling.md               # 辅助工具记录（历史）
+│   └── ragflow/                 # v0.1 RAGFlow 配置快照（历史，不再使用）
+├── data/                        # 虚构资料源文件与清单
+├── tests/
+│   ├── questions.v0.1.md        # 旧版 Markdown 问题集
+│   ├── questions.v0.2.json      # 评测脚本使用的 JSON 题集（当前含占位题）
+│   ├── eval.py                  # Developer API 评测脚本
+│   └── results/                 # 评测结果
+└── scripts/
+    └── check-env.ps1            # 旧版 Windows/Docker 检查脚本（历史）
 ```
 
-## 6. 部署与使用
+## 7. 部署与使用
 
 完整步骤见 [docs/deployment.md](docs/deployment.md)。
 
-**第一步只做环境检查，不执行部署。** 当前仓库不包含运行中的容器、不包含已入库的文档，也不包含任何真实密钥。
+快速路径：
 
-第二步计划：
+1. 启动 `D:\RAG库\AnythingLLM\AnythingLLM.exe`；
+2. 在设置中配置百炼 `qwen-plus` 与 `text-embedding-v4`；
+3. 创建 workspace `enterprise-rag-kb`；
+4. 上传 `data/` 下的虚构 PDF/Word；
+5. 启用 Developer API，把 key 写入本机 `.env`；
+6. 运行 `python tests/eval.py` 做评测。
 
-1. 处理 [known-issues.md](known-issues.md) 中的磁盘/内存前置条件；
-2. 按 `docs/deployment.md` 启动 RAGFlow；
-3. 配置百炼模型与 embedding；
-4. 导入 `data/` 下的虚构 PDF/Word；
-5. 用 `tests/` 中的问题做检索与引用验收。
+> `.env` 只在本机，已被 `.gitignore` 忽略；仓库只保留 `.env.example`。
 
-## 7. 安全与合规
+## 8. 安全与合规
 
-- **数据全部虚构**：公司名、产品型号、检验数值均为演示用虚构内容；禁止提交真实公司资料、客户信息、工艺配方等敏感数据。
-- **密钥不入库**：API key、数据库密码只存在于本机环境变量或未跟踪的 `.env` 中；提交前用 `git diff --cached` 自查。
-- **不暴露公网**：RAGFlow 仅监听本机/内网，演示阶段不做端口映射到公网，不启用公网域名。
-- **最小权限**：Docker Desktop 与 RAGFlow 使用本机个人环境，不接入企业域账号；后续再做账号与权限设计。
+完整基线见 [docs/security.md](docs/security.md)。
 
-## 8. 第一版范围与非目标
+- **资料全部虚构**：禁止真实公司资料、客户信息、工艺参数、个人信息。
+- **密钥不入库**：模型 key 在 AnythingLLM 界面录入；Developer API key 只放环境变量或本机 `.env`。
+- **不暴露公网**：AnythingLLM 仅监听 `127.0.0.1`，不做端口映射。
+- **明确外部数据流**：文档 chunk 与问题会发送到阿里云百炼；只用于虚构演示。
+- **遥测**：AnythingLLM 默认匿名遥测，建议 `DISABLE_TELEMETRY=true` 关闭。
 
-**范围内**
+## 9. 第一版范围与非目标
 
-- 3 类虚构企业资料（产品说明书、质量检验规范、设备操作手册）入库
-- 14 条测试问题，覆盖单文档事实、跨段落、数值指标、无答案拒答
-- 回答带 chunk 级引用，可人工核对
-- 单机 Docker 本地演示
+**范围内**：3 类虚构资料（产品说明书、质量检验规范、设备操作手册）、可复现问题集、chunk 引用、单机演示。
 
-**非目标（第一版不做）**
+**非目标**：本地大模型/GPU、云服务器、公网访问、SSO、多租户、高可用、自动同步企业网盘、移动端适配、生产级权限与审计。
 
-- 本地大模型 / GPU 推理
-- 云服务器、公网访问、SSO、多租户
-- 高可用、备份恢复、审计日志
-- 自动同步企业网盘 / OA
-- 移动端适配
-
-## 9. 里程碑
+## 10. 里程碑
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| 第一步 | 仓库初始化、选型、环境检查、部署文档、资料骨架 | ✅ 本次完成 |
-| 第二步 | 处理资源问题、启动 RAGFlow、制作并导入虚构资料 | 待开始 |
-| 第三步 | 测试问题集、引用核验、演示与已知问题收敛 | 待开始 |
+| 第一步 | RAGFlow 方案初始化、文档、环境检查 | ✅ 已完成，底座已废弃 |
+| 第二步 | AnythingLLM 部署、workspace、Developer API、评测通道 | 🔄 进行中 |
+| 第三步 | 资料制作入库、14+ 题测试、引用核验、演示 | 待开始 |
 
-## 10. 版本管理规范
+## 11. 版本管理规范
 
-- 每完成一个子任务提交一次 commit，消息使用 Conventional Commits 前缀（`chore:`、`docs:`、`feat:`、`fix:`）。
-- commit 正文说明“改了什么、为什么”。
+- 每完成一个子任务提交一次 commit，消息使用 Conventional Commits 前缀。
 - 严禁提交 API key、密码、真实企业资料；`.gitignore` 已拦截常见密钥文件。
-- 重要决策写入 README 或 `docs/design.md`，保证历史可追溯。
-
-## 11. 辅助工具链
-
-按任务要求评估并使用了 [skill-atlas](https://github.com/haozhouliuliuliu/skill-atlas)（GitHub 能力位索引工具）辅助检索可复用组件与规范。它本身不是 RAG 组件，也不参与运行时；使用记录与结论见 [docs/tooling.md](docs/tooling.md)。
+- 重要决策写入 README / `docs/architecture.md` / `docs/security.md`。
+- v0.1 RAGFlow 文档保留作历史，但不得作为当前部署依据。
