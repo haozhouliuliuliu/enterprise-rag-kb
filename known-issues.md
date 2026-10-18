@@ -105,7 +105,7 @@
   - Developer API `GET /workspaces` 返回 2 个 workspace；
   - `SMOKE-01` 调用成功，回答 `EVAL_OK`，判定“命中”。
 - **未覆盖**：真实文档上传后的 chunk/embedding/检索/引用链路，留到第三步资料入库时验证。
-- **证据**：`docs/deployment.md` 第 6.3、8 节；`tests/results/eval-20261018-174809.md`。
+- **证据**：`docs/deployment.md` 第 6.3、8 节；`tests/results/eval-20261018-175648.md`。
 
 ## KI-010：新机未安装 Docker Desktop/WSL2
 

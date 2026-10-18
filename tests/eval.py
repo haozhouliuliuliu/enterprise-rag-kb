@@ -2,11 +2,12 @@
 """AnythingLLM RAG 评测通道（v0.2）。
 
 读取 tests/questions.v0.2.json，逐题调用 AnythingLLM Developer API：
+  POST {base_url}/workspace/{workspace}/vector-search   # 有 expected_sources 时
   POST {base_url}/workspace/{workspace}/chat
   Authorization: Bearer <ANYTHINGLLM_API_KEY>
 
-记录回答、引用来源与片段，并按题目的 judge 规则输出
-命中 / 未命中 / 拒答 / 编造 / 错误 的汇总表。
+记录 Top-5 检索结果、回答、引用来源与片段，并按题目的 judge 规则输出
+命中 / 未命中 / 拒答 / 编造 / 错误 的汇总表，同时统计前 5 条检索命中。
 
 安全约束：
   - API key 只从环境变量或仓库根目录的 .env 读取；
@@ -35,6 +36,7 @@ DEFAULT_QUESTIONS = Path(__file__).with_name("questions.v0.2.json")
 DEFAULT_BASE_URL = "http://127.0.0.1:3001/api/v1"
 DEFAULT_WORKSPACE = "enterprise-rag-kb"
 DEFAULT_RESULT_DIR = Path(__file__).with_name("results")
+DEFAULT_RETRIEVAL_TOP_N = 5
 
 REFUSAL_MARKERS = (
     "资料中未找到",
@@ -217,18 +219,24 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
     for key in (VERDICT_HIT, VERDICT_MISS, VERDICT_REFUSAL, VERDICT_FABRICATION, VERDICT_ERROR):
         lines.append(f"| {key} | {report['summary'].get(key, 0)} |")
     lines.append(f"| 总题数 | {report['summary'].get('total', 0)} |")
+    lines.append(f"| 前 5 条检索可评估 | {report['summary'].get('retrieval_evaluable', 0)} |")
+    lines.append(f"| 前 5 条检索命中 | {report['summary'].get('retrieval_hits', 0)} |")
     lines.append("")
     lines.append("## 逐题记录")
     lines.append("")
-    lines.append("| ID | 类型 | 判定 | 回答摘要 | 引用来源 |")
-    lines.append("| --- | --- | --- | --- | --- |")
+    lines.append("| ID | 类型 | 判定 | 前5检索 | 回答摘要 | 引用来源 |")
+    lines.append("| --- | --- | --- | --- | --- | --- |")
     for item in report["results"]:
         answer = item["answer"].replace("|", "\\|").replace("\n", " ")[:300]
         sources = "<br>".join(
             f"{source_title(src)}" for src in item["sources"][:3]
         ) or "（无）"
         sources = sources.replace("|", "\\|")
-        lines.append(f"| {item['id']} | {item['type']} | {item['verdict']} | {answer} | {sources} |")
+        retrieval_hit = item.get("retrieval_hit")
+        retrieval_label = "—" if retrieval_hit is None else ("✅" if retrieval_hit else "❌")
+        lines.append(
+            f"| {item['id']} | {item['type']} | {item['verdict']} | {retrieval_label} | {answer} | {sources} |"
+        )
     lines.append("")
     lines.append("## 判定说明")
     lines.append("")
@@ -244,6 +252,15 @@ def write_markdown(path: Path, report: dict[str, Any]) -> None:
                 lines.append(f"- 来源：{source_title(source)}；片段：{snippet or '（空）'}")
         else:
             lines.append("- 来源：（无）")
+        if item.get("retrieval_hit") is None:
+            lines.append("- 前 5 条检索：（本题未设置 expected_sources，未评估）")
+        else:
+            lines.append(f"- 前 5 条检索命中：{'是' if item['retrieval_hit'] else '否'}")
+            for source in item.get("retrieval", [])[:5]:
+                snippet = source_snippet(source, limit=180)
+                lines.append(f"  - {source_title(source)}；片段：{snippet or '（空）'}")
+        if item.get("retrieval_error"):
+            lines.append(f"- 检索错误：{item['retrieval_error']}")
         lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -254,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", default=None)
     parser.add_argument("--workspace", default=None)
     parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--retrieval-top-n", type=int, default=DEFAULT_RETRIEVAL_TOP_N)
     parser.add_argument("--id", action="append", dest="ids", help="只运行指定题号，可重复")
     parser.add_argument("--result-dir", type=Path, default=DEFAULT_RESULT_DIR)
     parser.add_argument("--validate-only", action="store_true", help="只校验题集，不调用 API")
@@ -287,17 +305,38 @@ def main(argv: list[str] | None = None) -> int:
         print("[FAIL] 未找到 ANYTHINGLLM_API_KEY。请设置环境变量或在仓库根目录 .env 中配置。", file=sys.stderr)
         return 2
 
-    url = f"{base_url}/workspace/{workspace}/chat"
+    chat_url = f"{base_url}/workspace/{workspace}/chat"
+    search_url = f"{base_url}/workspace/{workspace}/vector-search"
     results: list[dict[str, Any]] = []
     for question in questions:
+        expected_sources = [str(x) for x in (question.get("judge", {}).get("expected_sources") or [])]
+        retrieval: list[dict[str, Any]] = []
+        retrieval_hit: bool | None = None
+        retrieval_error: str | None = None
+        print(f"[RUN] {question['id']} ...", flush=True)
+
+        if expected_sources:
+            try:
+                search = post_json(
+                    search_url,
+                    api_key,
+                    {"query": question["question"], "topN": args.retrieval_top_n},
+                    args.timeout,
+                )
+                retrieval = search.get("results") or []
+                if not isinstance(retrieval, list):
+                    retrieval = []
+                retrieval_hit = any(normalize(x) in source_blob(retrieval) for x in expected_sources)
+            except EvalError as exc:
+                retrieval_error = str(exc)
+
         payload = {
             "message": question["question"],
             "mode": question.get("mode", "query"),
             "sessionId": question.get("sessionId"),
         }
-        print(f"[RUN] {question['id']} ...", flush=True)
         try:
-            response = post_json(url, api_key, payload, args.timeout)
+            response = post_json(chat_url, api_key, payload, args.timeout)
             if response.get("error"):
                 raise EvalError(str(response["error"]))
             answer = str(response.get("textResponse") or "")
@@ -317,16 +356,29 @@ def main(argv: list[str] | None = None) -> int:
                 "expected": question.get("expected", ""),
                 "answer": answer,
                 "sources": sources,
+                "retrieval": retrieval,
+                "retrieval_hit": retrieval_hit,
+                "retrieval_error": retrieval_error,
                 "verdict": verdict,
                 "reason": reason,
             }
         )
         print(f"[{verdict}] {question['id']}：{reason}")
+        if retrieval_hit is not None:
+            print(f"      前5检索：{'命中' if retrieval_hit else '未命中'}（{len(retrieval)} 条）")
+        if retrieval_error:
+            print(f"      检索错误：{retrieval_error}")
         for source in sources[:3]:
             print(f"      来源：{source_title(source)}")
 
     summary = Counter(item["verdict"] for item in results)
     summary["total"] = len(results)
+    summary["retrieval_evaluable"] = sum(
+        1 for item in results if item.get("retrieval_hit") is not None
+    )
+    summary["retrieval_hits"] = sum(
+        1 for item in results if item.get("retrieval_hit") is True
+    )
     generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
     report = {
         "generated_at": generated_at,
@@ -348,6 +400,8 @@ def main(argv: list[str] | None = None) -> int:
     for key in (VERDICT_HIT, VERDICT_MISS, VERDICT_REFUSAL, VERDICT_FABRICATION, VERDICT_ERROR):
         print(f"| {key} | {summary.get(key, 0)} |")
     print(f"| 总题数 | {summary['total']} |")
+    print(f"| 前 5 条检索可评估 | {summary['retrieval_evaluable']} |")
+    print(f"| 前 5 条检索命中 | {summary['retrieval_hits']} |")
     print(f"\n结果已写入：{json_path}")
     print(f"可读报告：{md_path}")
     return 0 if summary.get(VERDICT_ERROR, 0) == 0 else 1

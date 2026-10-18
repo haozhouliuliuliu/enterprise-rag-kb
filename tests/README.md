@@ -11,7 +11,7 @@
 | [eval.py](eval.py) | AnythingLLM Developer API 评测脚本（仅标准库） | ✅ 已就绪 |
 | [results/template.md](results/template.md) | 人工测试记录模板（旧版） | ✅ 已定义 |
 | `results/eval-*.json/.md` | 脚本生成的结构化结果与可读报告 | ✅ SMOKE-01 已运行 |
-| [results/eval-20261018-174809.md](results/eval-20261018-174809.md) | 占位题实测：回答 `EVAL_OK`，判定命中 | ✅ 通过 |
+| [results/eval-20261018-175648.md](results/eval-20261018-175648.md) | 占位题实测：回答 `EVAL_OK`，判定命中；含 Top-5 检索统计 | ✅ 通过 |
 
 ## 评测脚本用法
 
@@ -34,6 +34,11 @@ python tests/eval.py --id SMOKE-01
 - `ANYTHINGLLM_BASE_URL`，默认 `http://127.0.0.1:3001/api/v1`
 - `ANYTHINGLLM_WORKSPACE_SLUG`，默认 `enterprise-rag-kb`
 - `ANYTHINGLLM_API_KEY`，必填；也可放在仓库根目录 `.env`（已忽略）
+
+对设置了 `judge.expected_sources` 的题，脚本会先调用
+`POST /workspace/{slug}/vector-search`，默认取 **Top-5**，记录检索结果并判断
+预期来源是否在前 5 条中；然后再调用 chat 记录回答与引用。可用
+`--retrieval-top-n 5` 调整。
 
 ## JSON 题目格式
 

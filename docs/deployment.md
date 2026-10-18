@@ -244,14 +244,14 @@ Authorization: Bearer <ANYTHINGLLM_API_KEY>
 
 结果写入 `tests/results/eval-*.json` 和 `.md`，包含回答、sources 与判定。完整题集在资料入库后补入 `questions.v0.2.json`。
 
-**本次实测（2026-10-18 17:48:09）：**
+**本次实测（2026-10-18 17:56:48，含 Top-5 检索统计）：**
 
 - 题号：`SMOKE-01`
 - 回答：`EVAL_OK`
 - 判定：**命中**
-- 汇总：命中 1 / 未命中 0 / 拒答 0 / 编造 0 / 错误 0
-- 结果文件：`tests/results/eval-20261018-174809.md`、`tests/results/eval-20261018-174809.json`
-- 说明：占位题用于验证 API 通道，不涉及检索；正式检索/引用评测在第三步。
+- 汇总：命中 1 / 未命中 0 / 拒答 0 / 编造 0 / 错误 0；前 5 条检索可评估 0、命中 0
+- 结果文件：`tests/results/eval-20261018-175648.md`、`tests/results/eval-20261018-175648.json`
+- 说明：占位题用于验证 API 通道，未设置 `expected_sources`，因此不触发检索；正式检索/引用评测在第三步。
 
 ## 9. 验收清单
 
