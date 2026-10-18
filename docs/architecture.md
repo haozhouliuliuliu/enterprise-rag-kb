@@ -97,7 +97,8 @@ C:\Users\Administrator\AppData\Roaming\anythingllm-desktop\
 │   ├── hotdir\               # 热目录
 │   ├── vector-cache\         # 向量缓存
 │   ├── logs\                 # 运行日志
-│   └── models\               # 本地模型（本项目不使用）
+│   ├── models\               # 本地模型（本项目不使用）
+│   └── .env                  # 本机模型 provider 配置（含 key，禁止提交）
 ├── Cache\
 ├── Local Storage\
 └── Preferences

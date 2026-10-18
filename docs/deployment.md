@@ -86,7 +86,8 @@ C:\Users\Administrator\AppData\Roaming\anythingllm-desktop\
     ├── lancedb\
     ├── hotdir\
     ├── logs\
-    └── models\
+    ├── models\
+    └── .env                 # 本机模型配置（含 key，禁止提交）
 ```
 
 检查服务：
@@ -132,13 +133,21 @@ Invoke-WebRequest 'http://127.0.0.1:3001/api/ping' -UseBasicParsing
 
 保存后点击连接/验证按钮，确认没有 401/404。模型 key 保存在本机应用数据目录，**不进入 Git**。
 
-### 5.4 连接验证
+### 5.4 连接验证（本次实测）
 
-新建一个临时 workspace 或使用当前 workspace 发送一句中文问候，确认：
+2026-10-18 已完成以下验证：
 
-- 能返回中文回答；
-- 不报 401/403/404；
-- 上传一个小文本文件后能完成 embedding，不报维度错误。
+| 验证 | 结果 |
+| --- | --- |
+| DashScope chat（`qwen-plus`） | HTTP 200，返回 chat completion |
+| DashScope embedding（`text-embedding-v4`） | HTTP 200，返回 **1024** 维向量 |
+| AnythingLLM LLM provider | 已保存 `LLM_PROVIDER='generic-openai'`、`qwen-plus` |
+| AnythingLLM Embedding provider | 已保存 `EMBEDDING_ENGINE='generic-openai'`、`text-embedding-v4`、chunk 8192、并发 20 |
+| AnythingLLM 聊天 | workspace 显示 `qwen-plus`，SMOKE-01 返回 `EVAL_OK` |
+
+模型 key 保存在本机 `%APPDATA%\anythingllm-desktop\storage\.env`（应用生成），不进入仓库。
+
+> 真正的“上传文档 → chunk embedding → 检索 → 引用”端到端验证在第三步资料入库后执行；本次仅验证模型 API 与配置。
 
 ## 6. 创建 workspace 与持久化验证（P1-07）
 
@@ -169,9 +178,31 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/v1/workspace/new'
 
 ### 6.3 实测结果（P1-07）
 
-> 待模型 key 配置完成后回填：workspace slug、重启前后结果、数据目录时间戳。
+**结论：通过。重启应用后 workspace 仍存在。**
+
+| 项目 | 实测值 |
+| --- | --- |
+| workspace | `enterprise-rag-kb` |
+| workspace id | `2` |
+| slug | `enterprise-rag-kb` |
+| 创建时间 | `2026-10-18T09:46:50.990Z`（界面显示 17:46） |
+| 数据目录 | `C:\Users\Administrator\AppData\Roaming\anythingllm-desktop\storage` |
+| SQLite | `anythingllm.db`，397,312 字节，重启前最后写入 2026-10-18 17:46:50 |
+| 重启前 API | `GET /api/v1/workspaces` 返回 2 个 workspace |
+| 退出方式 | CDP `Browser.close`；8 个 `AnythingLLM.exe` 进程全部结束，3001/8888/9222 停止监听 |
+| 重启后 API | `GET /api/v1/workspaces` 仍返回 `enterprise-rag-kb` |
+| 校验结果 | `P1_07_WORKSPACE_EXISTS=1` |
+
+重启后 Developer API key 仍然有效，说明 `api_keys` 表与 workspace 元数据均已持久化。
 
 ## 7. 启用 Developer API
+
+**本次已完成**：在 **Settings → Developer API** 生成 key，名称 `eval-local`。key 只保存在本机：
+
+- `C:\RAG库\secrets\anythingllm_api.key`（仓库外）
+- 仓库根目录 `.env`（已被 `.gitignore` 忽略）
+
+完整 key 不在本文、Git 或测试结果中。
 
 1. 打开 AnythingLLM **Settings → Developer API**；
 2. 启用 Developer API；
@@ -191,7 +222,7 @@ $headers = @{ Authorization = "Bearer $env:ANYTHINGLLM_API_KEY" }
 Invoke-RestMethod 'http://127.0.0.1:3001/api/v1/workspaces' -Headers $headers
 ```
 
-预期返回 `workspaces` 数组。API key 不是百炼模型 key，两者不要混用。
+预期返回 `workspaces` 数组。实测返回 2 个 workspace：`我的工作区` 与 `enterprise-rag-kb`。API key 不是百炼模型 key，两者不要混用。
 
 ## 8. 运行评测通道
 
@@ -213,16 +244,28 @@ Authorization: Bearer <ANYTHINGLLM_API_KEY>
 
 结果写入 `tests/results/eval-*.json` 和 `.md`，包含回答、sources 与判定。完整题集在资料入库后补入 `questions.v0.2.json`。
 
+**本次实测（2026-10-18 17:48:09）：**
+
+- 题号：`SMOKE-01`
+- 回答：`EVAL_OK`
+- 判定：**命中**
+- 汇总：命中 1 / 未命中 0 / 拒答 0 / 编造 0 / 错误 0
+- 结果文件：`tests/results/eval-20261018-174809.md`、`tests/results/eval-20261018-174809.json`
+- 说明：占位题用于验证 API 通道，不涉及检索；正式检索/引用评测在第三步。
+
 ## 9. 验收清单
 
 - [x] AnythingLLM v1.18.0 安装到 D 盘；
 - [x] 安装包签名与 SHA-256 已记录；
 - [x] 应用启动，`127.0.0.1:3001` 监听，数据目录已生成；
-- [ ] 百炼 LLM/Embedding 连接验证；
-- [ ] workspace `enterprise-rag-kb` 创建；
-- [ ] 重启后 workspace 仍存在（P1-07）；
-- [ ] Developer API 启用并成功调用；
-- [ ] 占位题返回 `EVAL_OK` 并记录结果；
+- [x] 百炼 `qwen-plus` chat 与 `text-embedding-v4` embedding 直连验证（1024 维）；
+- [x] AnythingLLM LLM/Embedding provider 配置并保存；
+- [x] workspace `enterprise-rag-kb` 创建；
+- [x] 重启后 workspace 仍存在（P1-07）；
+- [x] Developer API 启用并成功调用；
+- [x] 匿名遥测已关闭（`DISABLE_TELEMETRY='true'`）；
+- [x] 占位题返回 `EVAL_OK` 并记录结果；
+- [ ] 上传文档后的真实 embedding/检索链路（第三步）；
 - [ ] 14+ 题正式评测（第三步）。
 
 ## 10. 日常运维

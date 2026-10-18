@@ -13,11 +13,11 @@
 | KI-002 | P1 | Docker VM 内存 7.43 GB，低于 12 GB | **已通过更换底座规避**：不再使用 Docker/WSL2/VM | 已规避 |
 | KI-003 | P3 | Docker Desktop 未开机自启 | 已通过更换底座规避：不再使用 Docker | 已规避 |
 | KI-004 | P2 | 物理内存 15.96 GB，略低于 16 GB | 仍低于 16 GB，但不再预留 12 GB Docker VM，影响显著降低 | 已知限制 |
-| KI-005 | P2 | 百炼 API key 未配置 | 等待 key；配置后才能验证 `qwen-plus` / `text-embedding-v4` | 待处理 |
+| KI-005 | P2 | 百炼 API key 未配置 | 已配置并验证 `qwen-plus` / `text-embedding-v4` | 已解决 |
 | KI-006 | P3 | skill-atlas 拉取数据 IncompleteRead | 仅辅助工具，不影响 AnythingLLM | 已规避 |
 | KI-007 | P2 | Docker 基础组件端口暴露 | 已通过更换底座规避：仅本机 3001/8888 监听 | 已规避 |
 | KI-008 | P3 | RAGFlow 管理密码不可改 | RAGFlow 专属问题，已随底座更换消失 | 已规避 |
-| KI-009 | P3 | 尚未端到端启动验证 | AnythingLLM 已启动，workspace/API/持久化待验证 | 待处理 |
+| KI-009 | P3 | 尚未端到端启动验证 | workspace 创建、重启持久化、Developer API、SMOKE-01 均已通过 | 已解决 |
 | KI-010 | P1 | 新机未安装 Docker Desktop/WSL2 | **已通过更换底座规避**：原生应用不依赖 Docker/WSL2 | 已规避 |
 | KI-011 | INFO | Windows 10 22H2 已过常规支持期 | 原生应用不依赖 Docker 的系统支持期；降级为 INFO，安全补丁仍需关注 | 已知限制 |
 | KI-012 | P2 | 从带 `ELECTRON_RUN_AS_NODE=1` 的 Shell 启动会误入 Node 模式 | 已定位；正常双击启动不受影响 | 已规避 |
@@ -57,17 +57,17 @@
 - **影响**：同时打开大量浏览器标签、Office 或解析超大 PDF 时可能卡顿，但不阻止演示。
 - **规避**：演示机专用；关闭无关应用；单次只处理一份大文档。
 
-## KI-005：百炼 API key 尚未配置
+## KI-005：百炼 API key 未配置
 
 - **级别**：P2
-- **状态**：待处理
-- **现象**：`DASHSCOPE_API_KEY` 在 Process/User/Machine 环境变量、仓库 `.env`、本机 key 文件中均不存在。
-- **影响**：无法完成 AnythingLLM 模型配置、embedding、问答与评测 API 调用。
-- **规避/后续**：
-  1. 由用户提供 key（不要提交仓库）；
-  2. 在 AnythingLLM 设置中配置 `qwen-plus` 与 `text-embedding-v4`；
-  3. 验证连接后关闭本项；
-  4. 若 key 曾出现在聊天/日志中，演示后轮换。
+- **状态**：**已解决（2026-10-18）**
+- **旧现象**：`DASHSCOPE_API_KEY` 未配置，无法调用模型。
+- **处理结果**：
+  1. key 已保存到仓库外 `C:\RAG库\secrets\dashscope.key`；
+  2. DashScope 直连验证：`qwen-plus` chat 返回 200，`text-embedding-v4` 返回 **1024** 维向量；
+  3. AnythingLLM 已保存 `LLM_PROVIDER=generic-openai`、`qwen-plus`、`EMBEDDING_ENGINE=generic-openai`、`text-embedding-v4`；
+  4. 模型 key 保存在本机 `%APPDATA%\anythingllm-desktop\storage\.env`，未进入仓库。
+- **安全提醒**：本次 key 曾通过聊天传递，建议演示结束后在百炼控制台轮换；不得写入仓库、截图或提交信息。
 
 ## KI-006：skill-atlas 拉取数据出现 IncompleteRead
 
@@ -96,10 +96,16 @@
 ## KI-009：尚未端到端启动验证
 
 - **级别**：P3
-- **状态**：待处理
-- **已完成**：AnythingLLM v1.18.0 已安装到 D 盘，应用已启动，`127.0.0.1:3001` 已监听，数据目录与 `anythingllm.db` 已生成。
-- **待完成**：workspace 创建、模型连接验证、Developer API 启用、占位题调用、重启持久化（P1-07）。
-- **后续**：完成上述项后标记为“已解决”，并在 `docs/deployment.md` 记录证据。
+- **状态**：**已解决（2026-10-18）**
+- **已完成**：
+  - AnythingLLM v1.18.0 安装到 D 盘，`127.0.0.1:3001` 监听；
+  - 百炼 LLM/Embedding provider 配置并保存；
+  - workspace `enterprise-rag-kb` 创建（id=2）；
+  - 完全退出后重启，workspace 与 Developer API key 仍在（P1-07 通过）；
+  - Developer API `GET /workspaces` 返回 2 个 workspace；
+  - `SMOKE-01` 调用成功，回答 `EVAL_OK`，判定“命中”。
+- **未覆盖**：真实文档上传后的 chunk/embedding/检索/引用链路，留到第三步资料入库时验证。
+- **证据**：`docs/deployment.md` 第 6.3、8 节；`tests/results/eval-20261018-174809.md`。
 
 ## KI-010：新机未安装 Docker Desktop/WSL2
 

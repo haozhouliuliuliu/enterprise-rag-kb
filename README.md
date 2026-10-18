@@ -6,7 +6,7 @@
 >
 > **当前底座**：AnythingLLM Desktop v1.18.0（原生 Windows 应用，不依赖 Docker/WSL2）。
 >
-> **当前进度**：RAGFlow 方案已废弃；AnythingLLM 已安装并启动，正在完成模型配置、workspace、持久化验证与评测通道。
+> **当前进度**：RAGFlow 方案已废弃；AnythingLLM 已安装并启动，百炼模型、workspace、Developer API、重启持久化与 SMOKE-01 评测通道均已验证。正式资料入库与 14+ 题评测属于第三步。
 >
 > **换机 / 新会话交接**：先读 [HANDOFF.md](HANDOFF.md) 顶部的底座变更说明，再按 [docs/deployment.md](docs/deployment.md) 操作。HANDOFF 中的 RAGFlow 步骤仅作历史记录。
 
@@ -132,6 +132,9 @@ flowchart LR
 | AnythingLLM | v1.18.0，安装于 `D:\RAG库\AnythingLLM` | 安装包签名有效（Mintplex Labs） |
 | 本机服务 | `127.0.0.1:3001`（应用/API）、`127.0.0.1:8888`（collector） | 仅本机监听 |
 | 数据目录 | `%APPDATA%\anythingllm-desktop` | 本机为 `C:\Users\Administrator\AppData\Roaming\anythingllm-desktop` |
+| 百炼模型 | `qwen-plus` + `text-embedding-v4` 已保存 | chat/embedding 直连验证通过；embedding 1024 维 |
+| workspace | `enterprise-rag-kb`（id=2） | 重启后仍存在，P1-07 通过 |
+| Developer API | 已启用，SMOKE-01 命中 | key 只在本机 `.env`/仓库外文件 |
 | Docker/WSL2 | 未安装/未启用 | **已不需要**；KI-002、KI-010 通过更换底座规避 |
 | 8080 端口 | 空闲 | 本方案不使用 8080；AnythingLLM 使用 3001 |
 
@@ -184,7 +187,7 @@ enterprise-rag-kb/
 - **密钥不入库**：模型 key 在 AnythingLLM 界面录入；Developer API key 只放环境变量或本机 `.env`。
 - **不暴露公网**：AnythingLLM 仅监听 `127.0.0.1`，不做端口映射。
 - **明确外部数据流**：文档 chunk 与问题会发送到阿里云百炼；只用于虚构演示。
-- **遥测**：AnythingLLM 默认匿名遥测，建议 `DISABLE_TELEMETRY=true` 关闭。
+- **遥测**：已在 Settings → Privacy 关闭匿名遥测（`DISABLE_TELEMETRY='true'`）。
 
 ## 9. 第一版范围与非目标
 
@@ -197,7 +200,7 @@ enterprise-rag-kb/
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
 | 第一步 | RAGFlow 方案初始化、文档、环境检查 | ✅ 已完成，底座已废弃 |
-| 第二步 | AnythingLLM 部署、workspace、Developer API、评测通道 | 🔄 进行中 |
+| 第二步 | AnythingLLM 部署、workspace、Developer API、评测通道 | ✅ 本次完成（SMOKE-01 命中，P1-07 通过） |
 | 第三步 | 资料制作入库、14+ 题测试、引用核验、演示 | 待开始 |
 
 ## 11. 版本管理规范

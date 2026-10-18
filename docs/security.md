@@ -18,25 +18,25 @@
 
 | 密钥 | 用途 | 存放位置 | 是否入仓库 |
 | --- | --- | --- | --- |
-| `DASHSCOPE_API_KEY` | 百炼 `qwen-plus` 与 `text-embedding-v4` | AnythingLLM 设置界面录入，保存在本机应用数据目录；也可临时放入本机环境变量 | **禁止** |
-| `ANYTHINGLLM_API_KEY` | 调用本机 Developer API（评测脚本） | 本机环境变量或仓库根目录 `.env`（已被忽略） | **禁止** |
+| `DASHSCOPE_API_KEY` | 百炼 `qwen-plus` 与 `text-embedding-v4` | AnythingLLM 保存在 `%APPDATA%\anythingllm-desktop\storage\.env`；仓库外另有 `C:\RAG库\secrets\dashscope.key` | **禁止** |
+| `ANYTHINGLLM_API_KEY` | 调用本机 Developer API（评测脚本） | `C:\RAG库\secrets\anythingllm_api.key` + 仓库根目录 `.env`（已忽略） | **禁止** |
 | 其他数据库/对象存储密码 | 本项目不再使用 RAGFlow/Docker，无此类密码 | — | — |
 
 ### 2.1 百炼模型 key
 
 1. 在阿里云百炼控制台创建 key，确认 `qwen-plus`、`text-embedding-v4` 可用；
 2. 在 AnythingLLM **Settings → Model providers** 中录入，不写入 README、脚本或截图；
-3. key 保存在本机应用数据目录，依赖 Windows 账户权限保护；
+3. key 保存在本机 `%APPDATA%\anythingllm-desktop\storage\.env`，依赖 Windows 账户权限保护；该文件是明文配置，演示机应启用 BitLocker；
 4. 不在聊天、日志、录屏、提交信息中出现完整 key；
-5. 演示结束或疑似泄露时，在百炼控制台**吊销并重建**。
+5. 本次 key 曾通过聊天传递，建议演示结束后在百炼控制台**吊销并重建**。
 
 ### 2.2 AnythingLLM Developer API key
 
 1. 在 AnythingLLM **Settings → Developer API** 中启用并生成；
-2. 只在生成时展示一次，立即保存到本机密码管理器或 `.env`；
+2. 本次已生成名称 `eval-local` 的 key，保存到 `C:\RAG库\secrets\anythingllm_api.key` 与仓库根目录 `.env`；
 3. `tests/eval.py` 从 `ANYTHINGLLM_API_KEY` 环境变量或仓库根目录 `.env` 读取；
 4. `.env` 已被 `.gitignore` 忽略，禁止 `git add -f`；
-5. 如泄露，在 Developer API 设置中撤销并重新生成。
+5. 如泄露，在 Developer API 设置中撤销并重新生成；本次 key 曾在自动化输出中出现，建议演示前轮换一次。
 
 ### 2.3 提交前检查
 
@@ -90,7 +90,7 @@ git diff --cached | Select-String -Pattern 'sk-|DASHSCOPE|ANYTHINGLLM_API_KEY|Be
 ## 5. 遥测与日志
 
 - AnythingLLM 默认启用匿名遥测（启动、工作区创建、聊天等事件），可能发送到 Mintplex Labs；
-- 本项目建议通过环境变量 `DISABLE_TELEMETRY=true` 关闭；如界面提供隐私开关，以界面为准；
+- **本次已在 Settings → Privacy 关闭匿名遥测**，应用写入 `storage\.env` 的 `DISABLE_TELEMETRY='true'`；
 - 应用日志位于 `%APPDATA%\anythingllm-desktop\storage\logs`，禁止把完整日志直接提交仓库；
 - 提交测试结果前，检查回答与来源中是否混入真实数据或 key。
 
