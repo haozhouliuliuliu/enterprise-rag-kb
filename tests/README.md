@@ -13,7 +13,7 @@
 | `results/eval-*.json/.md` | 脚本生成的结构化结果与可读报告 | ✅ SMOKE-01 已运行 |
 | [results/eval-20261018-175648.md](results/eval-20261018-175648.md) | 占位题实测：回答 `EVAL_OK`，判定命中；含 Top-5 检索统计 | ✅ 通过 |
 | [questions.spotcheck.json](questions.spotcheck.json) | 22 份资料入库后的 5 类文档抽查题 | ✅ 已定义 |
-| [results/eval-20261018-184425.md](results/eval-20261018-184425.md) | 5 类抽查：5/5 命中、Top-5 5/5 | ✅ 通过 |
+| [results/eval-20261018-191433.md](results/eval-20261018-191433.md) | 5 类抽查复跑：5/5 命中、Top-5 5/5 | ✅ 通过 |
 | [results/table-pdf-quality.md](results/table-pdf-quality.md) | B04 表格 PDF 解析质量结论 | ✅ 完整/结构压平 |
 
 ## 评测脚本用法
