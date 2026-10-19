@@ -1,10 +1,9 @@
 # 文档索引
 
-| 文档 | 说明 |
-| --- | --- |
-| [deployment.md](deployment.md) | RAGFlow v0.27.2 在 Windows + Docker Desktop 上的部署步骤、资源前置与故障排查 |
-| [design.md](design.md) | 方案设计、ADR、引用链路与风险 |
-| [ragflow/](ragflow/) | RAGFlow v0.27.2 官方 compose 配置快照与校验值 |
-| [tooling.md](tooling.md) | 辅助工具 skill-atlas 的使用记录 |
+- [deployment.md](deployment.md)：从零部署与运行验证的通用步骤。
+- [architecture.md](architecture.md)：架构、检索与引用数据流。
+- [design.md](design.md)：选型依据与设计约束。
+- [security.md](security.md)：数据边界、密钥与使用限制。
+- [../known-issues.md](../known-issues.md)：已知限制与适用范围。
 
-> 本目录只存放可提交到仓库的文档；不含真实密钥、真实企业资料。
+仓库使用虚构示例资料；不要将真实企业数据或有效凭据提交到仓库。
