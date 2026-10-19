@@ -36,7 +36,7 @@
 2. 本次已生成名称 `eval-local` 的 key，保存到 `C:\RAG库\secrets\anythingllm_api.key` 与仓库根目录 `.env`；
 3. `tests/eval.py` 从 `ANYTHINGLLM_API_KEY` 环境变量或仓库根目录 `.env` 读取；
 4. `.env` 已被 `.gitignore` 忽略，禁止 `git add -f`；
-5. 如泄露，在 Developer API 设置中撤销并重新生成；本次 key 曾在自动化输出中出现，建议演示前轮换一次。
+5. 如泄露，在 Developer API 设置中撤销并重新生成；本机演示按用户决策不轮换，见 2.4。
 
 ### 2.3 提交前检查
 
@@ -48,31 +48,30 @@ git diff --cached | Select-String -Pattern 'sk-|DASHSCOPE|ANYTHINGLLM_API_KEY|Be
 
 发现任何真实 key，立即从暂存区移除并轮换；不要只依赖 `.gitignore`。
 
-### 2.4 本次 key 不轮换决策（2026-10-18）
+### 2.4 key 最终决策：不轮换，以本机可用版本为准（2026-10-19）
 
-- **决策**：按用户要求，第三步继续使用现有百炼 key，**不轮换**。
+- **决策**：本机演示**不轮换 key**，以以下两份本机文件为权威版本：
+  - `C:\RAG库\secrets\dashscope.key`
+  - `C:\RAG库\secrets\anythingllm_api.key`
 - **理由**：
   1. key 只在本机使用，AnythingLLM 仅监听 `127.0.0.1`；
   2. 全部 22 份文档与测试数据均为虚构，不含真实企业资料；
   3. 本机为单用户演示环境，key 只存在于应用数据目录与仓库外 secrets 文件；
-  4. 本轮需要连续完成 22 份文档 embedding 与 5 题抽查，轮换会增加中断风险。
-- **风险接受**：该 key 曾通过聊天传递；本轮将其视为已接受风险。若出现以下任一情况，**立即轮换**：
+  4. 当前 API 200、SMOKE 与 5 题抽查均通过，轮换会中断正在进行的评测。
+- **风险接受**：该 key 曾在聊天/自动化输出中出现，本轮将其视为已接受风险。若出现以下任一情况，**立即轮换**：
   - 演示机被他人使用、接入不可信网络或对外暴露；
   - 导入任何真实企业资料；
   - key 出现在截图、录屏、日志或新的 Git 提交中；
   - 百炼账单出现异常调用。
 - **约束**：无论是否轮换，key 都不得写入仓库、README、测试结果或 commit。
 
-### 2.5 本轮 key 状态核验（2026-10-18 19:13）
+### 2.5 key 状态澄清（2026-10-19，KI-014 已关闭）
 
-- 用户告知已轮换百炼 key 与 Developer API key，并更新 AnythingLLM 与本机 `.env`；
-- 实测本机 `C:\RAG库\secrets\dashscope.key`（mtime 17:27）、`anythingllm_api.key`（mtime 17:46）、
-  仓库 `.env`（mtime 17:46）与上一轮一致；哈希比对显示仓库 Developer key 与 secrets 文件相同，
-  应用 `storage/.env` 的模型 key 也与旧 secrets 相同；
-- 当前 key 仍可用：Developer API 200，DashScope chat 200，SMOKE-01 与 5 题抽查均通过；
-- **结论**：本机未检测到新 key 落地，可能更新未同步到这台机器。本轮没有再次改写 key，
-  避免与用户侧轮换冲突；如用户确认新 key 已生效，请重新执行本机文件/应用设置更新并复测。
-- 风险：若旧 key 已在云端吊销，后续调用会失败；若未吊销，旧 key 仍可能有效，应按泄露风险处理。
+- 用户明确：**key 不做轮换，以本机当前可用的 key 为权威版本**；
+- 本机 `C:\RAG库\secrets\dashscope.key` 与 `C:\RAG库\secrets\anythingllm_api.key` 为唯一来源；
+- 实测 Developer API 200、DashScope chat 200、SMOKE-01 与 5 题抽查均通过；
+- 此前“轮换未落地”的记录已澄清为**误判**，不再作为阻塞项；KI-014 关闭；
+- 后续步骤不得再因 key 问题阻塞。
 
 ## 3. 数据分类与使用约束
 
