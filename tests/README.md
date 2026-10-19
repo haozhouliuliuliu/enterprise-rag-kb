@@ -15,6 +15,10 @@
 | [questions.spotcheck.json](questions.spotcheck.json) | 22 份资料入库后的 5 类文档抽查题 | ✅ 已定义 |
 | [results/eval-20261018-191433.md](results/eval-20261018-191433.md) | 5 类抽查复跑：5/5 命中、Top-5 5/5 | ✅ 通过 |
 | [results/table-pdf-quality.md](results/table-pdf-quality.md) | B04 表格 PDF 解析质量结论 | ✅ 完整/结构压平 |
+| [questions.full.json](questions.full.json) | 30 题全量集：10 直接 + 5 综合 + 5 易混淆 + 5 版本 + 5 无答案 | ✅ 已定义 |
+| [results/full-30-summary.md](results/full-30-summary.md) | 三轮调参对比、最终三项指标、未达标题归因 | ✅ 已完成 |
+| [results/eval-20261019-111954.md](results/eval-20261019-111954.md) | 第 3 轮 30 题原始结果（N03 复判前） | ✅ 已记录 |
+| [results/eval-20261019-112107.md](results/eval-20261019-112107.md) | N03 拒答复判 | ✅ 拒答 |
 
 ## 评测脚本用法
 
@@ -65,6 +69,7 @@ python tests/eval.py --id SMOKE-01
 - `must_include_all`：回答必须包含全部关键词；
 - `must_include_any`：回答至少包含一个关键词；
 - `expected_sources`：sources 的标题或片段必须命中至少一个来源标识；
+- `expected_sources_all`：sources 必须同时命中全部来源标识（用于跨文档/版本对比题）；
 - 其余情况判“未命中”；API/网络异常判“错误”。
 
 ## 通过标准（v0.2）

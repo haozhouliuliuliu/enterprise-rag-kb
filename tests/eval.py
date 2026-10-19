@@ -43,11 +43,17 @@ REFUSAL_MARKERS = (
     "资料未找到",
     "未找到相关资料",
     "没有找到相关",
-    "未提及",
     "资料不足",
     "无法从资料",
     "无法回答",
     "没有相关信息",
+    "没有相关记录",
+    "无任何记录",
+    "从未出现",
+    "未出现",
+    "没有提供",
+    "未提供相关",
+    "不存在相关",
     "不包含该信息",
     "not found",
     "insufficient information",
@@ -183,6 +189,14 @@ def judge(question: dict[str, Any], answer: str, sources: list[dict[str, Any]]) 
             return VERDICT_MISS, "引用来源未匹配：" + "、".join(expected_sources)
         return VERDICT_HIT, "关键词与引用来源匹配：" + "、".join(matched)
 
+    expected_all = [str(x) for x in (rule.get("expected_sources_all") or [])]
+    if expected_all:
+        blob = source_blob(sources)
+        missing = [x for x in expected_all if normalize(x) not in blob]
+        if missing:
+            return VERDICT_MISS, "引用来源未同时匹配：" + "、".join(missing)
+        return VERDICT_HIT, "关键词与全部引用来源匹配：" + "、".join(expected_all)
+
     return VERDICT_HIT, "满足判定规则"
 
 
@@ -309,13 +323,15 @@ def main(argv: list[str] | None = None) -> int:
     search_url = f"{base_url}/workspace/{workspace}/vector-search"
     results: list[dict[str, Any]] = []
     for question in questions:
-        expected_sources = [str(x) for x in (question.get("judge", {}).get("expected_sources") or [])]
+        judge_rule = question.get("judge", {})
+        expected_sources = [str(x) for x in (judge_rule.get("expected_sources") or [])]
+        expected_all = [str(x) for x in (judge_rule.get("expected_sources_all") or [])]
         retrieval: list[dict[str, Any]] = []
         retrieval_hit: bool | None = None
         retrieval_error: str | None = None
         print(f"[RUN] {question['id']} ...", flush=True)
 
-        if expected_sources:
+        if expected_sources or expected_all:
             try:
                 search = post_json(
                     search_url,
@@ -326,7 +342,11 @@ def main(argv: list[str] | None = None) -> int:
                 retrieval = search.get("results") or []
                 if not isinstance(retrieval, list):
                     retrieval = []
-                retrieval_hit = any(normalize(x) in source_blob(retrieval) for x in expected_sources)
+                blob = source_blob(retrieval)
+                if expected_all:
+                    retrieval_hit = all(normalize(x) in blob for x in expected_all)
+                else:
+                    retrieval_hit = any(normalize(x) in blob for x in expected_sources)
             except EvalError as exc:
                 retrieval_error = str(exc)
 
