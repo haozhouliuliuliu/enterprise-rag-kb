@@ -1,0 +1,17 @@
+{
+  "version": "0.1-p1-05-add",
+  "description": "P1-05 文档更新测试：新增 X-300 后验证事实命中。",
+  "questions": [
+    {
+      "id": "UPD-ADD",
+      "question": "X-300 的额定功率是多少？",
+      "type": "文档更新/新增命中",
+      "mode": "query",
+      "expected": "15 W，来源 X-300 产品说明书",
+      "judge": {
+        "must_include_all": ["15 W"],
+        "expected_sources": ["X-300 产品说明书"]
+      }
+    }
+  ]
+}

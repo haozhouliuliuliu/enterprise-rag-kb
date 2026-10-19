@@ -76,9 +76,10 @@ Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' |
 | 入库后（2026-10-18 18:45） | `D:\RAG库\backup\anythingllm-post-ingest-20261018-184559` | `anythingllm.db`（约 0.5 MB）、`documents`（约 0.05 MB）、`lancedb`（约 0.14 MB） |
 | 第三步复核（2026-10-18 19:13） | `D:\RAG库\backup\anythingllm-step3-rerun-20261018-191323` | 同上，复核时 22 份文档/22 个 chunk 仍在 |
 | 第四步调参后（2026-10-19 11:21） | `D:\RAG库\backup\anythingllm-step4-final-20261019-112120` | `anythingllm.db` 约 1.75 MB、`documents` 约 0.05 MB、`lancedb` 约 0.47 MB；29 个 chunk |
+| 最终交付（2026-10-19 11:49） | `D:\RAG库\backup\anythingllm-final-20261019-114908` | `anythingllm.db` 约 2.36 MB、`documents` 约 0.05 MB、`lancedb` 约 0.48 MB；X-300 已删除，29 个 chunk |
 
 入库前备份在应用完全退出后复制；入库后备份使用 SQLite 在线备份 API，并复制
-`documents` 与 `lancedb`。四份备份均保存在 D 盘，不进入 Git。
+`documents` 与 `lancedb`。五份备份均保存在 D 盘，不进入 Git。
 
 > 2026-10-18 19:13 的复核确认：22 份文档和 22 个 chunk 未丢失；本轮未重复生成、
 > 未重复上传，避免产生重复文档。
@@ -230,7 +231,7 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/v1/workspace/new'
 | Vector DB | LanceDB | 本地 `storage\lancedb\enterprise-rag-kb.lance` |
 | Chunk size | **1000** | 2026-10-19 调整后的 `RecursiveSplitter` 实际值 |
 | Chunk overlap | **100** | 2026-10-19 调整后的实际值 |
-| Top-N | `5` | workspace 设置，用于评测 |
+| Top-N | **8** | Top-N 8 实验后保留（Top-5 指标不变、来源支持提升） |
 | 相似度阈值 | `0.0` | 为兼容本机 L2/JS cosine 排序而下调 |
 | 聊天模式 | `query` | 仅根据资料回答 |
 | 文档数 | 22 | 12 DOCX + 10 PDF |
@@ -271,11 +272,16 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/v1/workspace/new'
 | 第 2 轮 | 强化型号/版本约束、修拒答词 | 20 | 5 | 4 | 1（N03 误判） | 0 | 21/25 | 20/25 |
 | 第 3 轮 | 增加“不得编造 CONTEXT/版本” | 21 | 4 | 4 | 1（N03 误判） | 0 | 21/25 | 21/25 |
 | N03 复判 | 补“未出现”拒答词 | — | — | 1/1 | 0 | 0 | — | — |
+| Top-N 8 | 5→8，其余不变 | 22 | 2 | 6（含 M03 误拒答） | 0 | 0 | 21/25 | **22/25** |
 
-**最终：Top-5 21/25=84%；回答来源 21/25=84%；无答案 5/5（N03 复判后）。**
+**最终：Top-5 21/25=84%；回答来源 22/25=88%；无答案 5/5（N03 复判后）。**
 
-未达标题归因：M01/C05 为检索未返回 X-100 说明书 + LLM 型号混淆；M03/C01 为
-引用来源列表未包含目标文档。详见 `tests/results/full-30-summary.md`。
+决策：Top-N 8 下三项指标均未降低（Top-5 持平、来源 21→22、无答案持平），因此
+**保留 Top-N=8**；代价是 M03 在更大上下文中变成误拒答，记为剩余风险。
+
+未达标题归因：M03 为多文档问题误拒答；C01/C05 为检索未返回 X-100 说明书 +
+引用来源缺失/型号混淆；M01 已被 Top-N 8 修复。详见
+`tests/results/full-30-summary.md`。
 
 ## 7. 启用 Developer API
 

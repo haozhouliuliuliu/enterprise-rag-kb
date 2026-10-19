@@ -19,6 +19,11 @@
 | [results/full-30-summary.md](results/full-30-summary.md) | 三轮调参对比、最终三项指标、未达标题归因 | ✅ 已完成 |
 | [results/eval-20261019-111954.md](results/eval-20261019-111954.md) | 第 3 轮 30 题原始结果（N03 复判前） | ✅ 已记录 |
 | [results/eval-20261019-112107.md](results/eval-20261019-112107.md) | N03 拒答复判 | ✅ 拒答 |
+| [questions.doc-update-add.json](questions.doc-update-add.json) / [delete](questions.doc-update-delete.json) | P1-05 新增/删除文档测试题 | ✅ 已定义 |
+| [results/eval-20261019-114025.md](results/eval-20261019-114025.md) | X-300 新增后 15 W 命中 | ✅ 命中 |
+| [results/eval-20261019-114057.md](results/eval-20261019-114057.md) | X-300 删除后资料不足拒答 | ✅ 拒答 |
+| [results/doc-update-test.md](results/doc-update-test.md) | P1-05 四项验证完整记录 | ✅ 通过 |
+| [results/eval-20261019-114757.md](results/eval-20261019-114757.md) | Top-N 8 实验：22/25 来源支持 | ✅ 保留 8 |
 
 ## 评测脚本用法
 

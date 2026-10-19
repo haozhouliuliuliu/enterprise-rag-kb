@@ -1,0 +1,17 @@
+{
+  "version": "0.1-p1-05-delete",
+  "description": "P1-05 文档更新测试：删除 X-300 后验证 Query 模式拒答。",
+  "questions": [
+    {
+      "id": "UPD-DEL",
+      "question": "X-300 的额定功率是多少？",
+      "type": "文档更新/删除后拒答",
+      "mode": "query",
+      "expected": "资料不足，不应给出 15 W 或其他编造数值",
+      "judge": {
+        "must_refuse": true,
+        "expected_sources": []
+      }
+    }
+  ]
+}
