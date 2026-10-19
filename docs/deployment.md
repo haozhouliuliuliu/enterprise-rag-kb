@@ -75,9 +75,10 @@ Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' |
 | 入库前（2026-10-18 18:05） | `D:\RAG库\backup\anythingllm-20261018-180531` | `anythingllm.db`（约 0.38 MB）、空 `documents`、空 `lancedb` |
 | 入库后（2026-10-18 18:45） | `D:\RAG库\backup\anythingllm-post-ingest-20261018-184559` | `anythingllm.db`（约 0.5 MB）、`documents`（约 0.05 MB）、`lancedb`（约 0.14 MB） |
 | 第三步复核（2026-10-18 19:13） | `D:\RAG库\backup\anythingllm-step3-rerun-20261018-191323` | 同上，复核时 22 份文档/22 个 chunk 仍在 |
+| 第四步调参后（2026-10-19 11:21） | `D:\RAG库\backup\anythingllm-step4-final-20261019-112120` | `anythingllm.db` 约 1.75 MB、`documents` 约 0.05 MB、`lancedb` 约 0.47 MB；29 个 chunk |
 
 入库前备份在应用完全退出后复制；入库后备份使用 SQLite 在线备份 API，并复制
-`documents` 与 `lancedb`。三份备份均保存在 D 盘，不进入 Git。
+`documents` 与 `lancedb`。四份备份均保存在 D 盘，不进入 Git。
 
 > 2026-10-18 19:13 的复核确认：22 份文档和 22 个 chunk 未丢失；本轮未重复生成、
 > 未重复上传，避免产生重复文档。
@@ -168,7 +169,7 @@ Invoke-WebRequest 'http://127.0.0.1:3001/api/ping' -UseBasicParsing
 | DashScope chat（`qwen-plus`） | HTTP 200，返回 chat completion |
 | DashScope embedding（`text-embedding-v4`） | HTTP 200，返回 **1024** 维向量 |
 | AnythingLLM LLM provider | 已保存 `LLM_PROVIDER='generic-openai'`、`qwen-plus` |
-| AnythingLLM Embedding provider | 已保存 `EMBEDDING_ENGINE='generic-openai'`、`text-embedding-v4`、chunk 8192、并发 20 |
+| AnythingLLM Embedding provider | 已保存 `EMBEDDING_ENGINE='generic-openai'`、`text-embedding-v4`、并发 20；chunk 初始 8192，后调整为 1000 |
 | AnythingLLM 聊天 | workspace 显示 `qwen-plus`，SMOKE-01 返回 `EVAL_OK` |
 
 模型 key 保存在本机 `%APPDATA%\anythingllm-desktop\storage\.env`（应用生成），不进入仓库。
@@ -227,18 +228,25 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/v1/workspace/new'
 | --- | --- | --- |
 | Embedding 模型 | `text-embedding-v4` | 1024 维 |
 | Vector DB | LanceDB | 本地 `storage\lancedb\enterprise-rag-kb.lance` |
-| Chunk size | `8192` | AnythingLLM `RecursiveSplitter` 实际值 |
-| Chunk overlap | `20` | 实际值 |
+| Chunk size | **1000** | 2026-10-19 调整后的 `RecursiveSplitter` 实际值 |
+| Chunk overlap | **100** | 2026-10-19 调整后的实际值 |
 | Top-N | `5` | workspace 设置，用于评测 |
 | 相似度阈值 | `0.0` | 为兼容本机 L2/JS cosine 排序而下调 |
+| 聊天模式 | `query` | 仅根据资料回答 |
 | 文档数 | 22 | 12 DOCX + 10 PDF |
-| 总 chunk 数 | 22 | 每份文档 1 chunk |
-| 表格 PDF | `B04` QS-001 V2.0 | 1 chunk，内容完整，表格行列被压平 |
+| 总 chunk 数 | **29** | 长文档 2 个，短文档 1 个 |
+| 表格 PDF | `B04` QS-001 V2.0 | 2 个 chunk，内容完整，表格行列被压平 |
 
-> **分块观察**：默认 chunk size 8192 使每份文档只生成 1 个 chunk。表格数值完整保留，但
-> 行列边界在 chunk 文本中被压平；后续若要更细的引用粒度，建议把 chunk size 调到
-> 1000–1500 并重新入库。详见 `tests/results/table-pdf-quality.md` 与
-> `tests/results/table-pdf-chunks.md`。
+**系统提示词（workspace）：**
+
+> 仅根据提供的资料回答；资料中没有答案时，明确说明“资料不足”并指出缺什么，禁止编造。
+> 回答涉及型号、版本或日期时，必须逐项注明对应的型号、版本与发布日期，不得混用
+> X-100/X-100S/X-200 或 V2.0/V2.1；优先引用原文数值，不要改写小数点或单位。引用来源时
+> 只写实际来源文件名，不要编造 CONTEXT 编号或文档版本；无法在资料中定位数值时，明确说明资料不足。
+
+> **分块观察**：1000/100 后关键文档（X-100、X-100S、X-200、两个 QS 版本、M-3/M-3 Pro）
+> 各 2 个 chunk，短文档仍 1 个；B04 表格数值完整保留，但行列边界在 chunk 文本中被压平。
+> 详见 `tests/results/table-pdf-quality.md` 与 `tests/results/table-pdf-chunks.md`。
 
 ### 6.5 本机兼容性补丁（AVX2）
 
@@ -250,12 +258,24 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/v1/workspace/new'
 - 备份原文件：`D:\RAG库\backup\server.js.original-20261018-182358`
 - 修改文件：`D:\RAG库\AnythingLLM\resources\backend\server.js`
 - 修改内容：不再调用 LanceDB 原生 `vectorSearch`，改为读取表行并在 Node 中计算
-  cosine（22 条向量，开销可忽略）；同时把 workspace 阈值设为 `0.0`。
-- 验证：`/vector-search` 与 `/chat` 均正常；5 道抽查题 5/5 命中。
+  cosine（当前 29 条向量，开销可忽略）；同时把 workspace 阈值设为 `0.0`。
+- 验证：`/vector-search` 与 `/chat` 均正常；5 道抽查题 5/5 命中，30 题全量评测可运行。
 - **注意**：AnythingLLM 升级会覆盖该文件，升级后需重新评估/补丁；这不是上游正式修复。
   该补丁仅适用于本机演示，不改变模型或应用选型。
 
-## 7. 启用 Developer API
+### 6.6 调参记录（30 题全量）
+
+| 轮次 | 调整 | 命中 | 未命中 | 拒答 | 编造 | 错误 | Top-5 | 来源支持 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 第 1 轮 | 1000/100、Query 模式、首版提示词 | 20 | 4 | 5 | 0 | 1（瞬时 500） | 21/25 | 20/25 |
+| 第 2 轮 | 强化型号/版本约束、修拒答词 | 20 | 5 | 4 | 1（N03 误判） | 0 | 21/25 | 20/25 |
+| 第 3 轮 | 增加“不得编造 CONTEXT/版本” | 21 | 4 | 4 | 1（N03 误判） | 0 | 21/25 | 21/25 |
+| N03 复判 | 补“未出现”拒答词 | — | — | 1/1 | 0 | 0 | — | — |
+
+**最终：Top-5 21/25=84%；回答来源 21/25=84%；无答案 5/5（N03 复判后）。**
+
+未达标题归因：M01/C05 为检索未返回 X-100 说明书 + LLM 型号混淆；M03/C01 为
+引用来源列表未包含目标文档。详见 `tests/results/full-30-summary.md`。
 
 ## 7. 启用 Developer API
 
